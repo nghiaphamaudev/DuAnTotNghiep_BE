@@ -4,14 +4,14 @@ import mongoose from 'mongoose';
 const historyBillSchema = new mongoose.Schema(
   {
     idUser: {
-      // type: mongoose.Schema.Types.ObjectId,
-      // ref: "User",
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
       // required: true,
       type: String,
     },
     idBill: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Bill',
+      ref: 'Order',
       required: true,
     },
     creator: {

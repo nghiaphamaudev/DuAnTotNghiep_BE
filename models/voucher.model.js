@@ -5,7 +5,7 @@ const voucherSchema = new mongoose.Schema(
     codeVoucher: {
       type: String,
       unique: true,
-      required: [true, 'A category must to have a code !'],
+      required: true,
     },
     //Mô tả của voucher vd Nhân ngày thành lập cửa hàng
     description: { type: String, default: '' },
