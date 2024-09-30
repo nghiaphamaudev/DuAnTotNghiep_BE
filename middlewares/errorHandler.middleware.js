@@ -1,5 +1,5 @@
 import AppError from '../utils/appError.util';
-
+import { StatusCodes } from 'http-status-codes';
 const handleValidatorError = (error) => {
   const errors = Object.values(error.errors).map((el) => el.message);
   const message = errors.join('. ');
@@ -52,8 +52,8 @@ const sendErrorProd = (err, req, res) => {
   }
 };
 
-const errorHandler = (err, req, res, next) => {
-  err.statusCode = err.statusCode || 500;
+const errorHandlerGlobal = (err, req, res, next) => {
+  err.statusCode = err.statusCode || StatusCodes.INTERNAL_SERVER_ERROR;
   err.status = err.status || 'error';
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, req, res);
@@ -68,4 +68,4 @@ const errorHandler = (err, req, res, next) => {
   }
 };
 
-export default errorHandler;
+export default errorHandlerGlobal;

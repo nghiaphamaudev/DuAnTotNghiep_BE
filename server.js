@@ -1,11 +1,10 @@
 import connectDB from './configs/db.config.js';
-import express from 'express';
+import app from './app.js';
 import dotenv from 'dotenv';
 import http from 'http';
 import { Server } from 'socket.io';
 dotenv.config();
 
-const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
@@ -30,6 +29,6 @@ io.on('connection', (socket) => {
 
 connectDB(DB);
 
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`The server is listening at ${PORT}...`);
 });
