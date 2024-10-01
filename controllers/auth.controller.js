@@ -3,6 +3,7 @@ import catchAsync from '../utils/catchAsync.util';
 import AppError from '../utils/appError.util';
 import User from '../models/user.model';
 import { StatusCodes } from 'http-status-codes';
+import { promisify } from 'util';
 import { registerSchema, loginSchema } from '../utils/userValidate.util';
 
 //Hàm tạo token
@@ -86,3 +87,47 @@ export const Login = catchAsync(async (req, res, next) => {
     );
   createSendRes(user, StatusCodes.OK, res);
 });
+
+//Kiểm tra user có thực sự đã ddanwng nhập hay chưa
+export const Protect = catchAsync(async (req, res, next) => {
+  //Kiểm tra token có thực sự đi kèm với header ko
+  let token;
+
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.cookies.jwt) {
+    token = req.cookies.jwt;
+  }
+
+  console.log(token);
+  if (!token) {
+    return next(
+      new AppError('Bạn chưa đăng nhập, vui lòng đăng nhập để tiếp tục')
+    );
+  }
+
+  //Giải mã token
+  //promisify dùng để biển đổi 1 hàm callback thành promise
+  // Hàm lấy ra id_user => tìm user có tồn tại trong db ko
+  const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+  const currentUser = await User.findById(decoded.id);
+  if (!currentUser) {
+    return next(
+      new AppError('The user beloging to this token does not exist.', 401)
+    );
+  }
+  if (currentUser.changedPasswordAfter(decoded.iat)) {
+    return next(
+      new AppError('User recently changed password! Please log in again', 401)
+    );
+  }
+  req.user = currentUser;
+  res.locals.user = currentUser;
+  next();
+});
+
+//Hạn chế quyền
+export const restrictTo = (...roles) => {};
