@@ -18,6 +18,7 @@ app.use(cookieParser());
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
 
 app.use('/api/v1/categories', categoryRouter);
+
 app.use('/api/v1/users', userRouter);
 
 app.all('*', (req, res, next) => {
