@@ -12,4 +12,6 @@ categorySeasonRouter.patch("/categories/:id", updateCategorySeason);
 
 
 
+
 export default categorySeasonRouter;
+

@@ -10,6 +10,11 @@ const categorySeasonSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    season: {
+      type: String,
+      enum: ['spring', 'summer', 'autumn', 'winter'], // Các mùa
+      required: [true, 'A category must have a season'],
+    },
   },
   {
     toJSON: { virtuals: true },
