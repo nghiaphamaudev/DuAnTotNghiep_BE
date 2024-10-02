@@ -1,10 +1,17 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import catchAsync from '../utils/catchAsync.util';
 import AppError from '../utils/appError.util';
 import User from '../models/user.model';
 import { StatusCodes } from 'http-status-codes';
 import { promisify } from 'util';
-import { registerSchema, loginSchema } from '../utils/userValidate.util';
+import {
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from '../validator/user.validator';
+import { sendMailServiceForgotPassword } from '../services/email.service';
 
 //Hàm tạo token
 const signToken = (id) => {
@@ -34,7 +41,7 @@ const createSendRes = (user, statusCode, res) => {
 };
 
 //Register
-export const Register = catchAsync(async (req, res, next) => {
+export const register = catchAsync(async (req, res, next) => {
   //Lấy dữ liệu từ form
   const { email, fullName, password, phoneNumber } = req.body;
   //Validate từ form
@@ -59,7 +66,7 @@ export const Register = catchAsync(async (req, res, next) => {
   createSendRes(newUser, StatusCodes.CREATED, res);
 });
 
-export const Login = catchAsync(async (req, res, next) => {
+export const login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
   //Validate từ form
   const { error } = loginSchema.validate({ email }, { abortEarly: false });
@@ -88,9 +95,11 @@ export const Login = catchAsync(async (req, res, next) => {
   createSendRes(user, StatusCodes.OK, res);
 });
 
-//Kiểm tra user có thực sự đã ddanwng nhập hay chưa
-export const Protect = catchAsync(async (req, res, next) => {
-  //Kiểm tra token có thực sự đi kèm với header ko
+// Kiểm tra token từ header hoặc cookie.
+// Giải mã token và kiểm tra người dùng tương ứng có tồn tại không.
+// Kiểm tra xem mật khẩu của người dùng có thay đổi sau khi token được phát hành không.
+// Nếu mọi thứ hợp lệ, nó cho phép tiếp tục xử lý yêu cầu.
+export const protect = catchAsync(async (req, res, next) => {
   let token;
 
   if (
@@ -101,33 +110,169 @@ export const Protect = catchAsync(async (req, res, next) => {
   } else if (req.cookies.jwt) {
     token = req.cookies.jwt;
   }
-
-  console.log(token);
   if (!token) {
     return next(
       new AppError('Bạn chưa đăng nhập, vui lòng đăng nhập để tiếp tục')
     );
   }
-
-  //Giải mã token
-  //promisify dùng để biển đổi 1 hàm callback thành promise
-  // Hàm lấy ra id_user => tìm user có tồn tại trong db ko
+  // Kiểm tra trong trường hợp người dùng này đã bị xóa  nhưng vẫn có token để đăng nhập
   const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
   const currentUser = await User.findById(decoded.id);
   if (!currentUser) {
     return next(
-      new AppError('The user beloging to this token does not exist.', 401)
+      new AppError('User này không tồn tại', StatusCodes.UNAUTHORIZED)
     );
   }
+  //Kiểm tra User đã thay đổi mật khẩu n
   if (currentUser.changedPasswordAfter(decoded.iat)) {
     return next(
-      new AppError('User recently changed password! Please log in again', 401)
+      new AppError(
+        'Tài khoản đã thay đổi mật khẩu! Vui lòng đăng nhập lại',
+        StatusCodes.UNAUTHORIZED
+      )
     );
   }
   req.user = currentUser;
-  res.locals.user = currentUser;
   next();
 });
 
 //Hạn chế quyền
-export const restrictTo = (...roles) => {};
+export const restrictTo = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return next(
+        new AppError(
+          'Bạn không có quyền thực hiện hành động này!',
+          StatusCodes.FORBIDDEN
+        )
+      );
+    }
+    next();
+  };
+};
+
+//Validate email nhập bởi user
+//Tìm email user có tồn tại chưa
+//Tạo resetToken và gửi cho user , băm resetToken lưu vào db
+//Gửi đường dẫn qua email
+export const forgotPassword = catchAsync(async (req, res, next) => {
+  //1) Get User based on posted email
+  const { email } = req.body;
+  //Validate từ form
+  const { error } = forgotPasswordSchema.validate(
+    { email },
+    { abortEarly: false }
+  );
+  if (error) {
+    const messages = error.details.map((item) => item.message);
+    return res.status(StatusCodes.BAD_REQUEST).json({ messages });
+  }
+  const user = await User.findOne({ email });
+  if (!user)
+    return next(new AppError('Email không tồn tại', StatusCodes.NOT_FOUND));
+  //2) Generate the random reset token
+  const resetToken = user.createPasswordResetToken();
+  await user.save({ validateBeforeSave: false });
+  //3) Sent it to email
+  const resetURL = `${req.protocol}://${req.get(
+    'host'
+  )}/api/v1/users/resetPassword/${resetToken}`;
+  try {
+    await sendMailServiceForgotPassword(
+      user.email,
+      'Đặt lại mật khẩu (có hiệu lực trong 10 phút)',
+      resetURL
+    );
+
+    res.status(StatusCodes.OK).json({
+      status: 'success',
+      message: 'Token đặt lại mật khẩu đã được gửi đến email của bạn!',
+    });
+  } catch (error) {
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    return next(
+      new AppError(
+        'Có lỗi xảy ra khi gửi email. Vui lòng thử lại sau!',
+        StatusCodes.INTERNAL_SERVER_ERROR
+      )
+    );
+  }
+});
+
+export const resetPassword = catchAsync(async (req, res, next) => {
+  //Validate password, passwordConfirm
+  const { password, passwordConfirm } = req.body;
+  const { error } = resetPasswordSchema.validate(
+    { password, passwordConfirm },
+    { abortEarly: false }
+  );
+  if (error) {
+    const messages = error.details.map((item) => item.message);
+    return res.status(StatusCodes.BAD_REQUEST).json({ messages });
+  }
+  //Băm lại token và so sánh với token trong db
+  //Kiểm tra thời hạn của resetToken
+  const hashedToken = crypto
+    .createHash('sha256')
+    .update(req.params.resetToken)
+    .digest('hex');
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetTokenExpires: { $gt: Date.now() },
+  });
+
+  if (!user)
+    return next(
+      new AppError(
+        'Mã xác thực không hợp lệ hoặc đã hết hạn!',
+        StatusCodes.BAD_REQUEST
+      )
+    );
+
+  //Đổi mật khẩu và lưu lại thời gian thay đổi mật khẩu
+  user.password = password;
+  user.passwordResetToken = undefined;
+  user.passwordResetTokenExpires = undefined;
+  await user.save();
+
+  createSendRes(user, StatusCodes.OK, res);
+});
+
+export const updatePassword = catchAsync(async (req, res, next) => {
+  //Validate password và passwordConfirm
+  const { password, passwordConfirm, passwordCurrent } = req.body;
+  const { error } = resetPasswordSchema.validate(
+    { password, passwordConfirm },
+    { abortEarly: false }
+  );
+  if (error) {
+    const messages = error.details.map((item) => item.message);
+    return res.status(StatusCodes.BAD_REQUEST).json({ messages });
+  }
+  //Lấy thong tin người dùng qua protect
+  const currentUser = await User.findById(req.user.id).select('+password');
+  if (!currentUser)
+    return next(
+      new AppError('Tài khoản không tồn tại ', StatusCodes.BAD_REQUEST)
+    );
+  //2) Check password hiện tại
+  if (!(await currentUser.checkPassword(passwordCurrent)))
+    return next(
+      new AppError('Mật khẩu hiện tại không đúng', StatusCodes.UNAUTHORIZED)
+    );
+  //Cập nhật new password
+  currentUser.password = password;
+  await currentUser.save();
+  createSendRes(currentUser, StatusCodes.CREATED, res);
+});
+
+export const logout = (req, res) => {
+  res.cookie('jwt', 'loggedout', {
+    expires: new Date(Date.now() + 10 * 1000),
+    httpOnly: true,
+  });
+  res.status(StatusCodes.OK).json({ status: 'success' });
+};

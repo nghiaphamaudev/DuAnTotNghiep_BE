@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcryptjs from 'bcryptjs';
+import crypto from 'crypto';
 const userSchema = new mongoose.Schema(
   {
     email: {
@@ -51,8 +52,8 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
     passwordChangedAt: Date,
-    passwordRefreshToken: String,
-    passwordRefreshTokenExpires: Date,
+    passwordResetToken: String,
+    passwordResetTokenExpires: Date,
     active: {
       type: Boolean,
       default: true,
@@ -74,14 +75,25 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
+//kiểm tra password có được tạo mới hay thay đổi không , nếu ko thì ko cần cập nhật passwordchangedAt
+//Nếu password thay đổi => passwordchangeAt = Thời gian hiện tại  -1000ms
+//passwordChangedAt luôn trước thời điểm token JWT được tạo, tránh tình huống xung đột do sự chênh lệch thời gian.
+userSchema.pre('save', function (next) {
+  if (!this.isModified('password') || this.isNew) return next();
+  this.passwordChangedAt = Date.now() - 1000;
+  next();
+});
+
 //So sánh password db với password nhập bởi user
 userSchema.methods.checkPassword = async function (password) {
   return await bcryptjs.compare(password, this.password);
 };
 
+//dùng để kiểm tra  người dùng có thay đổi pass sau khi mã jwt được tạo hay không
+//nếu this.passwordChangedAT tồn tại thì => user đã thay đổi password mà chưa đăng nhập lại
+// Nếu changedTimestamps > JWTTimestamp  => người dùng đã thay đổi pass sau khi jwt đc tạo +. người dùng dăng nhập lại
+//Nói cách khác là khi người dùng đăng nhập vào và sau đó thay đổi mật khẩu thì bắt phải đăng nhập lại
 userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
-  //Check passwordChangedAt is really exsited
-  //true: Th user has been changed password
   if (this.passwordChangedAt) {
     const changedTimestamps = parseInt(
       this.passwordChangedAt.getTime() / 1000,
@@ -90,6 +102,20 @@ userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
     return JWTTimestamp < changedTimestamps;
   }
   return false;
+};
+
+//Tạo 1 resetToken để
+//resetToken chưa hash => user
+// reset hashed => db
+userSchema.methods.createPasswordResetToken = function () {
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+
+  this.passwordResetTokenExpires = Date.now() + 10 * 60 * 1000;
+  return resetToken;
 };
 
 const User = mongoose.model('User', userSchema);

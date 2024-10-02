@@ -10,7 +10,7 @@ const fullNameSchema = Joi.string().min(7).max(50).required().messages({
 const emailSchema = Joi.string().email().required().messages({
   'string.empty': 'Email không được để trống',
   'string.email': 'Email không hợp lệ!',
-  'any.required': 'Email là bắt buộc',
+  'any.required': 'Vui lòng cung cấp email!',
 });
 
 const passwordSchema = Joi.string()
@@ -51,4 +51,12 @@ export const registerSchema = Joi.object({
 
 export const loginSchema = Joi.object({
   email: emailSchema,
+});
+
+export const forgotPasswordSchema = Joi.object({
+  email: emailSchema,
+});
+export const resetPasswordSchema = Joi.object({
+  password: passwordSchema,
+  passwordConfirm: confirmPasswordSchema,
 });
