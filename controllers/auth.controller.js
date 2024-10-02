@@ -1,88 +1,122 @@
-import jwt from 'jsonwebtoken';
-import catchAsync from '../utils/catchAsync.util';
-import AppError from '../utils/appError.util';
-import User from '../models/user.model';
-import { StatusCodes } from 'http-status-codes';
-import { registerSchema, loginSchema } from '../utils/userValidate.util';
-
-//Hàm tạo token
-const signToken = (id) => {
-  return jwt.sign({ id: id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
-  });
-};
-
-//Hàm gửi token và cookie
-const createSendRes = (user, statusCode, res) => {
-  const token = signToken(user._id);
-  const cookieOptions = {
-    expires: new Date(
-      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
-    ),
-    httpOnly: true,
-    secure: true,
-  };
-
-  res.cookie('jwt', token, cookieOptions);
-  user.password = undefined;
-  res.status(statusCode).json({
-    status: 'success',
-    data: user,
-    accessToken: token,
-  });
-};
-
-//Register
-export const Register = catchAsync(async (req, res, next) => {
-  //Lấy dữ liệu từ form
-  const { email, fullName, password, phoneNumber } = req.body;
-  //Validate từ form
-  const { error } = registerSchema.validate(req.body, { abortEarly: false });
-  // Hiển thị lỗi
-  if (error) {
-    const messages = error.details.map((item) => item.message);
-    return res.status(StatusCodes.BAD_REQUEST).json({ messages });
+import mongoose from 'mongoose';
+import bcryptjs from 'bcryptjs';
+import crypto from 'crypto';
+const userSchema = new mongoose.Schema(
+  {
+    email: {
+      type: String,
+      lowercase: true,
+    },
+    fullName: {
+      type: String,
+      required: true,
+    },
+    phoneNumber: {
+      type: String,
+      required: true,
+    },
+    avatar: {
+      type: String,
+      default: 'default.jpg',
+    },
+    role: {
+      type: String,
+      enum: ['admin', 'user'],
+      default: 'user',
+    },
+    rank: {
+      type: String,
+      enum: ['Bronze', 'Silver', 'Gold'],
+      default: 'Bronze',
+    },
+    addresses: [
+      {
+        name: String,
+        phone: String,
+        address: String,
+        isDefault: Boolean,
+      },
+    ],
+    favoriteProduct: [
+      {
+        product: {
+          type: mongoose.Schema.ObjectId,
+          required: false,
+          ref: 'Laptop',
+        },
+      },
+    ],
+    password: {
+      type: String,
+      select: false,
+      required: true,
+    },
+    passwordChangedAt: Date,
+    passwordResetToken: String,
+    passwordResetTokenExpires: Date,
+    active: {
+      type: Boolean,
+      default: true,
+      select: true,
+    },
+  },
+  {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+    versionKey: false,
+    timestamps: true,
   }
+);
 
-  //Check email tồn tại
-  const existedUser = await User.findOne({ email });
-  if (existedUser) {
-    return next(
-      new AppError(
-        'Email đã tồn tại, vui lòng sử dụng email khác!',
-        StatusCodes.BAD_REQUEST
-      )
-    );
-  }
-  const newUser = await User.create({ email, fullName, password, phoneNumber });
-  createSendRes(newUser, StatusCodes.CREATED, res);
+//Mã hóa password trước khi lưu vào db
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcryptjs.hash(this.password, 12);
+  next();
 });
 
-export const Login = catchAsync(async (req, res, next) => {
-  const { email, password } = req.body;
-  //Validate từ form
-  const { error } = loginSchema.validate({ email }, { abortEarly: false });
-  if (error) {
-    const messages = error.details.map((item) => item.message);
-    return res.status(StatusCodes.BAD_REQUEST).json({ messages });
-  }
-  //Tìm user với email
-  const user = await User.findOne({ email }).select('+password');
-  //Kiểm tra liệu user có tồn tại trong db hay không và check password
-  if (!user || !(await user.checkPassword(password))) {
-    return next(
-      new AppError(
-        'Email hoặc mật khẩu không chính xác!',
-        StatusCodes.UNAUTHORIZED
-      )
-    );
-  }
-  if (user.active === false)
-    return next(
-      new AppError(
-        'Tài khoản của bạn đã bạn chặn, vui lòng liên hệ với quản trị viên!!',
-        StatusCodes.FORBIDDEN
-      )
-    );
-  createSendRes(user, StatusCodes.OK, res);
+//kiểm tra password có được tạo mới hay thay đổi không , nếu ko thì ko cần cập nhật passwordchangedAt
+//Nếu password thay đổi => passwordchangeAt = Thời gian hiện tại  -1000ms
+//passwordChangedAt luôn trước thời điểm token JWT được tạo, tránh tình huống xung đột do sự chênh lệch thời gian.
+userSchema.pre('save', function (next) {
+  if (!this.isModified('password') || this.isNew) return next();
+  this.passwordChangedAt = Date.now() - 1000;
+  next();
 });
+
+//So sánh password db với password nhập bởi user
+userSchema.methods.checkPassword = async function (password) {
+  return await bcryptjs.compare(password, this.password);
+};
+
+//dùng để kiểm tra  người dùng có thay đổi pass sau khi mã jwt được tạo hay không
+//nếu this.passwordChangedAT tồn tại thì => user đã thay đổi password mà chưa đăng nhập lại
+// Nếu changedTimestamps > JWTTimestamp  => người dùng đã thay đổi pass sau khi jwt đc tạo +. người dùng dăng nhập lại
+//Nói cách khác là khi người dùng đăng nhập vào và sau đó thay đổi mật khẩu thì bắt phải đăng nhập lại
+userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
+  if (this.passwordChangedAt) {
+    const changedTimestamps = parseInt(
+      this.passwordChangedAt.getTime() / 1000,
+      10
+    );
+    return JWTTimestamp < changedTimestamps;
+  }
+  return false;
+};
+
+//Tạo 1 resetToken để
+//resetToken chưa hash => user
+// reset hashed => db
+userSchema.methods.createPasswordResetToken = function () {
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+
+  this.passwordResetTokenExpires = Date.now() + 10 * 60 * 1000;
+  return resetToken;
+};
+
+const User = mongoose.model('User', userSchema);
+export default User;

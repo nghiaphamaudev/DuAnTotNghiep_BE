@@ -13,12 +13,10 @@ const PORT = process.env.PORT;
 
 io.on('connection', (socket) => {
   console.log('A user connected');
-
   // Xử lý sự kiện 'disconnect'
   socket.on('disconnect', () => {
     console.log('A user disconnected');
   });
-
   // Xử lý sự kiện tùy chỉnh
   socket.on('chat message', (msg) => {
     console.log('Message: ' + msg);
