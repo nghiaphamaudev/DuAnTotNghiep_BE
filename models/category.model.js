@@ -4,7 +4,7 @@ const categorySchema = new mongoose.Schema(
     name: {
       type: String,
       unique: true,
-      required: [true, 'A category must to have a name !'],
+      required: true,
     },
     active: {
       type: Boolean,

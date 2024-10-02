@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
+import mongoosePaginate from "mongoose-paginate-v2";
+
 const productSchema = new mongoose.Schema(
   {
     name: {
       type: String,
       unique: true,
-      required: [true, 'A category must to have a name !'],
+      required: true,
     },
     category: {
       type: mongoose.Schema.ObjectId,
@@ -12,7 +14,7 @@ const productSchema = new mongoose.Schema(
     },
     coverImg: {
       type: String,
-      required: [true, 'A product must have a image'],
+      required: true,
     },
     ratingAverage: {
       type: Number,
@@ -53,7 +55,7 @@ const productSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      required: [true, 'A product must have a description'],
+      required: true,
     },
     status: {
       type: String,
@@ -68,6 +70,6 @@ const productSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-
+productSchema.plugin(mongoosePaginate);
 const Product = mongoose.model('Product', productSchema);
 export default Product;
