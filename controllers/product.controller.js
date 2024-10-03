@@ -2,20 +2,22 @@ import Product from "../models/product.model";
 import { StatusCodes } from "http-status-codes";
 import catchAsync from "../utils/catchAsync.util";
 import AppError from "../utils/appError.util";
-
+import { productSchema } from '../validator/products.validator';
 
 
 
 //thêm sản phẩm
 export const createProduct = catchAsync(async (req, res, next) => {
+    const { error } = productSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+        return next(new AppError(error.details.map((detail) => detail.message).join(', '), StatusCodes.BAD_REQUEST));
+    }
     const product = await Product.create(req.body);
-
     return res.status(StatusCodes.CREATED).json({
         status: 'success',
         data: product,
     });
 });
-
 //lấy tất cả sản phẩm
 export const getAllProducts = catchAsync(async (req, res) => {
     const { _page = 1, _limit = 10, _sort = "createdAt", _order = "asc", _expand } = req.query;
@@ -60,15 +62,22 @@ export const getProductById = catchAsync(async (req, res) => {
 });
 
 //cập nhật sản phẩm
-export const updateProduct = catchAsync(async (req, res) => {
+export const updateProduct = catchAsync(async (req, res, next) => {
+    const { error } = productSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+        return next(new AppError(
+            error.details.map((detail) => detail.message).join(', '),
+            StatusCodes.BAD_REQUEST
+        ));
+    }
     const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
-
     if (!product) {
-        // Nếu không tìm thấy sản phẩm
         throw new AppError('Product not found', StatusCodes.NOT_FOUND);
     }
-
-    return res.status(StatusCodes.OK).json(product);
+    return res.status(StatusCodes.OK).json({
+        status: 'success',
+        data: product,
+    });
 });
 
 //gợi ý sản phẩm theo danh mục

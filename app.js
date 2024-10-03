@@ -10,8 +10,6 @@ import userRouter from './routes/user.route.js';
 import productRouter from './routes/product.route.js';
 import categorySeasonRouter from './routes/categorySeason.router.js';
 
-import categorySeasonRouter from './routes/categorySeason.router.js';
-import productRouter from './routes/product.route.js';
 
 
 
