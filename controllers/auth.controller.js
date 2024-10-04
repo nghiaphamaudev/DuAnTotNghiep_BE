@@ -133,6 +133,7 @@ export const protect = catchAsync(async (req, res, next) => {
     );
   }
   req.user = currentUser;
+  req.user.id = decoded.id;
   next();
 });
 
