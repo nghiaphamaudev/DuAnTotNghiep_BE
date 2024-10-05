@@ -98,3 +98,160 @@ export const updateMe = catchAsync(async (req, res, next) => {
     },
   });
 });
+
+export const addAddress = catchAsync(async (req, res, next) => {
+  const currentUser = req.user;
+  let isDefault = false;
+  const { name, phone, address } = req.body;
+  if (currentUser.addresses.length === 0) {
+    isDefault = true;
+  }
+
+  const newAddress = [
+    ...currentUser.addresses,
+    { name, phone, address, isDefault },
+  ];
+  //Add new address
+  const addresses = await User.findByIdAndUpdate(
+    currentUser._id,
+    { addresses: newAddress },
+    {
+      new: true,
+    }
+  );
+  res.status(StatusCodes.OK).json({
+    status: 'success',
+    data: addresses,
+  });
+});
+
+export const updateAddress = catchAsync(async (req, res, next) => {
+  const currentUser = req.user;
+  const idAddress = req.params.addressId;
+  const { name, phone, address } = req.body;
+
+  // tìm và cập nhật địa chỉ
+  const updatedAddresses = currentUser.addresses.map((addr) =>
+    addr._id.toString() === idAddress
+      ? { ...addr.toObject(), name, phone, address }
+      : addr
+  );
+
+  const user = await User.findByIdAndUpdate(
+    currentUser._id,
+    { addresses: updatedAddresses },
+    { new: true }
+  );
+
+  res.status(StatusCodes.OK).json({
+    status: 'success',
+    data: user.addresses,
+  });
+});
+
+export const updateStatusAddress = catchAsync(async (req, res, next) => {
+  const currentUser = req.user;
+  const idAddressUpdate = req.params.addressId;
+
+  // Tìm và đặt isDefault thành false cho địa chỉ hiện tại đang là mặc định
+  const currentDefaultAddress = currentUser.addresses.find(
+    (address) => address.isDefault === true
+  );
+
+  //set isDefault cho address ti thay la false mang hien tai se la false
+  //Tat ca dang thao tac vo mang
+  if (currentDefaultAddress) {
+    currentDefaultAddress.isDefault = false;
+  }
+
+  // Tìm địa chỉ được truyền qua param và đặt isDefault thành true
+  const addressToUpdate = currentUser.addresses.find(
+    (address) => address._id.toString() === idAddressUpdate
+  );
+
+  if (!addressToUpdate) {
+    return next(new AppError('Address not found', 404));
+  }
+  addressToUpdate.isDefault = true;
+
+  currentUser.addresses.sort((a, b) => b.isDefault - a.isDefault);
+
+  // Cập nhật user với danh sách địa chỉ mới
+  await User.findByIdAndUpdate(currentUser._id, {
+    addresses: currentUser.addresses,
+  });
+
+  return res.status(StatusCodes.OK).json({
+    status: 'success',
+    data: currentUser.addresses,
+  });
+});
+
+export const deleteAddress = catchAsync(async (req, res, next) => {
+  const userId = req.user.id; // Lấy ID người dùng từ xác thực (JWT)
+  const addressId = req.params.addressId; // Lấy ID địa chỉ từ URL
+
+  // Tìm người dùng và xóa địa chỉ theo ID
+  const user = await User.findById(userId);
+  if (!user) {
+    return res
+      .status(StatusCodes.NOT_FOUND)
+      .json({ message: 'Người dùng không tồn tại' });
+  }
+
+  // Lọc ra danh sách địa chỉ mà không chứa địa chỉ cần xóa
+  user.addresses = user.addresses.filter(
+    (address) => address._id.toString() !== addressId
+  );
+
+  // Lưu lại thông tin người dùng sau khi xóa địa chỉ
+  await user.save();
+
+  res
+    .status(StatusCodes.OK)
+    .json({ message: 'Xóa địa chỉ thành công', addresses: user.addresses });
+});
+
+export const addFavoriteProduct = catchAsync(async (req, res, next) => {
+  const currentUser = req.user;
+  const idFavoriteProduct = req.params.id;
+  const currentArrayFavoriteProduct = currentUser.favoriteProduct;
+
+  const isExsitedIdFavoriteProduct = currentArrayFavoriteProduct.find(
+    (el) => el.product == idFavoriteProduct
+  );
+  if (isExsitedIdFavoriteProduct)
+    return res.status(StatusCodes.OK).json({
+      status: 'success',
+    });
+
+  const favoriteProduct = await User.findByIdAndUpdate(
+    currentUser._id,
+    { $push: { favoriteProduct: { product: idFavoriteProduct } } },
+    { new: true, runValidators: true }
+  );
+
+  //Add new address
+
+  res.status(StatusCodes.OK).json({
+    status: 'success',
+    data: favoriteProduct,
+  });
+});
+
+export const removeFavoriteProduct = catchAsync(async (req, res, next) => {
+  const currentUser = req.user;
+  const idFavoriteProduct = req.params.id;
+
+  // Remove product from favoriteProduct array
+  const updatedUser = await User.findByIdAndUpdate(
+    currentUser._id,
+    { $pull: { favoriteProduct: { product: idFavoriteProduct } } },
+    { new: true, runValidators: true }
+  );
+
+  res.status(StatusCodes.OK).json({
+    status: 'success',
+    data: updatedUser,
+  });
+});
