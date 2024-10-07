@@ -60,3 +60,8 @@ export const resetPasswordSchema = Joi.object({
   password: passwordSchema,
   passwordConfirm: confirmPasswordSchema,
 });
+
+export const updateMeSchema = Joi.object({
+  fullName: fullNameSchema,
+  phoneNumber: phoneNumberSchema,
+});

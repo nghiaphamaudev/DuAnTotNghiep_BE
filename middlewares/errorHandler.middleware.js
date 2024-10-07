@@ -3,12 +3,12 @@ import { StatusCodes } from 'http-status-codes';
 const handleValidatorError = (error) => {
   const errors = Object.values(error.errors).map((el) => el.message);
   const message = errors.join('. ');
-  return new AppError(message, 400);
+  return new AppError(message, StatusCodes.BAD_REQUEST);
 };
 
 const handleCastError = (error) => {
   const message = 'The ID product not existed!';
-  return new AppError(message, 400);
+  return new AppError(message, StatusCodes.BAD_REQUEST);
 };
 
 const handleDuplicateDB = (error) => {
@@ -19,12 +19,17 @@ const handleDuplicateDB = (error) => {
   );
   values = values.join(' ');
   const message = `${values} has exsisted . Try again!`;
-  return new AppError(message, 400);
+  return new AppError(message, StatusCodes.BAD_REQUEST);
 };
 
 const handleJWTExpired = (error) => {
   const message = 'Your session has expired. Please log in again.';
-  return new AppError(message, 400);
+  return new AppError(message, StatusCodes.BAD_REQUEST);
+};
+
+const handleLimitFileUser = (error) => {
+  const message = 'Tối đa 1 hỉnh ảnh';
+  return new AppError(message, StatusCodes.BAD_REQUEST);
 };
 
 const sendErrorDev = (err, req, res) => {
@@ -64,6 +69,8 @@ const errorHandlerGlobal = (err, req, res, next) => {
     if (err.code === 11000) error = handleDuplicateDB(error);
     if (err.name === 'CastError') error = handleCastError(error);
     if (err.message === 'jwt expired') error = handleJWTExpired(error);
+    if (err.code === 'LIMIT_UNEXPECTED_FILE')
+      error = handleLimitFileUser(error);
     sendErrorProd(error, req, res);
   }
 };
