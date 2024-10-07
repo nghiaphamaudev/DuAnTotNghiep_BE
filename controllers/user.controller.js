@@ -255,3 +255,93 @@ export const removeFavoriteProduct = catchAsync(async (req, res, next) => {
     data: updatedUser,
   });
 });
+
+export const getAllUser = catchAsync(async (req, res, next) => {
+  // Lấy số trang và số bản ghi trên mỗi trang từ query params
+  const page = parseInt(req.query.page) || 1; // Mặc định là trang 1
+  const limit = 6; // Số bản ghi trên mỗi trang
+  const skip = (page - 1) * limit;
+
+  // Tìm tất cả người dùng với giới hạn và phân trang
+  const users = await User.find().skip(skip).limit(limit);
+
+  // Đếm tổng số người dùng để trả về tổng số trang
+  const totalUsers = await User.countDocuments();
+  const totalPages = Math.ceil(totalUsers / limit);
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      users,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        limit,
+        totalUsers,
+      },
+    },
+  });
+});
+
+export const getUserById = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.params.userId);
+  if (!user)
+    return next(new AppError('User không tồn tại!', StatusCodes.NOT_FOUND));
+  res.status(StatusCodes.OK).json({
+    status: 'success',
+    data: user,
+  });
+});
+
+export const toggleBlockUserById = catchAsync(async (req, res, next) => {
+  const userId = req.params.userId;
+  const { shouldBlock } = req.body;
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(
+      new AppError('Người dùng không tồn tại!', StatusCodes.NOT_FOUND)
+    );
+  }
+
+  await user.toggleBlockUser(shouldBlock);
+
+  res.status(StatusCodes.OK).json({
+    status: 'success',
+    message: shouldBlock
+      ? 'Người dùng đã bị chặn thành công'
+      : 'Người dùng đã được bỏ chặn thành công',
+    data: user,
+  });
+});
+
+export const changeUserRole = catchAsync(async (req, res, next) => {
+  const userId = req.params.userId;
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(
+      new AppError('Người dùng không tồn tại!', StatusCodes.NOT_FOUND)
+    );
+  }
+
+  // Chuyển đổi vai trò người dùng
+  user.role = user.role === 'admin' ? 'user' : 'admin';
+  await user.save();
+
+  res.status(StatusCodes.OK).json({
+    status: 'success',
+    message: `Vai trò người dùng đã được thay đổi thành công thành ${user.role}`,
+    data: user,
+  });
+});
+
+export const deleteUserById = catchAsync(async (req, res, next) => {
+  const user = await User.findByIdAndDelete(req.params.userId);
+  if (!user) {
+    return next(
+      new AppError('Người dùng không tồn tại!', StatusCodes.NOT_FOUND)
+    );
+  }
+  res.status(StatusCodes.OK).json({ status: 'success' });
+});

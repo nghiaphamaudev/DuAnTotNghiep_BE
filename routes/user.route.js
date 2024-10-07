@@ -13,15 +13,20 @@ import { uploadUserImage } from '../middlewares/uploadCloud.middleware';
 import {
   addAddress,
   addFavoriteProduct,
+  changeUserRole,
   deleteAddress,
   deleteMe,
+  deleteUserById,
+  getAllUser,
   removeFavoriteProduct,
+  toggleBlockUserById,
   updateAddress,
   updateMe,
   updateStatusAddress,
 } from '../controllers/user.controller';
 const userRouter = express.Router({ mergeParams: true });
 
+/**************AUTHENTICATION****************/
 userRouter.post('/auth/register', register);
 userRouter.post('/auth/login', login);
 userRouter.get('/auth/logout', logout);
@@ -29,7 +34,7 @@ userRouter.post('/auth/forgotPassword', forgotPassword);
 userRouter.patch('/auth/resetPassword/:resetToken', resetPassword);
 
 userRouter.use(protect);
-
+/**************USER-ACTIONS****************/
 userRouter.patch('/auth/updatePassword', updatePassword);
 userRouter.patch('/deleteMe', deleteMe);
 userRouter.patch('/updateMe', restrictTo('user'), uploadUserImage, updateMe);
@@ -43,5 +48,11 @@ userRouter
   .route('/favorite-products/:id')
   .post(addFavoriteProduct)
   .patch(removeFavoriteProduct);
+
+/**************ADMIN-USER-MANAGEMENT****************/
+userRouter.get('/admin', getAllUser);
+userRouter.patch('/admin/:userId/toggle-block', toggleBlockUserById);
+userRouter.patch('/admin/:userId/change-user-role', changeUserRole);
+userRouter.delete('/admin/:userId', deleteUserById);
 
 export default userRouter;
