@@ -9,6 +9,8 @@ import categoryRouter from './routes/category.route.js';
 import userRouter from './routes/user.route.js';
 import productRouter from './routes/product.route.js';
 import categorySeasonRouter from './routes/categorySeason.router.js';
+import cartRouter from './routes/cart.route.js';
+
 
 const app = express();
 app.use(cors());
@@ -29,6 +31,7 @@ app.use('/api/v1/categories', categoryRouter);
 app.use('/api/v1/season', categorySeasonRouter);
 app.use('/api/v1/products', productRouter);
 app.use('/api/v1/users', userRouter);
+app.use('/api/v1/cart', cartRouter);
 
 app.all('*', (req, res, next) => {
   return next(
