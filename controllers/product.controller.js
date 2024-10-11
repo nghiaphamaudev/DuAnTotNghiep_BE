@@ -7,11 +7,11 @@ import { uploadProductImages } from "../middlewares/uploadCloud.middleware";
 
 
 export const createProduct = catchAsync(async (req, res, next) => {
-
     if (!req.files || req.files.length === 0) {
         console.log('No cover image found!');
         return next(new AppError('Ảnh bìa sản phẩm là bắt buộc', StatusCodes.BAD_REQUEST));
     }
+
     const { name, category, description, variants } = req.body;
 
     if (!name || !category || !description || !variants || variants.length === 0) {
@@ -21,15 +21,22 @@ export const createProduct = catchAsync(async (req, res, next) => {
     // Lấy đường dẫn ảnh bìa từ file đầu tiên
     const coverImg = req.files[0].path;
 
-    // Tạo sản phẩm
+    // Loại bỏ ảnh bìa khỏi danh sách ảnh còn lại
+    const remainingImages = req.files.slice(1);
+
+    // Chỉ giữ lại số ảnh bằng số biến thể
+    const variantImages = remainingImages.slice(0, variants.length);
+
+    // Tạo dữ liệu sản phẩm
     const productData = {
         name,
         category,
         description,
         coverImg,
-        variants: variants.map(variant => ({
+        variants: variants.map((variant, index) => ({
             ...variant,
-            images: req.files.map(file => file.path)
+            // Gán ảnh cho từng biến thể, mỗi biến thể chỉ nhận một ảnh
+            images: variantImages[index] ? [variantImages[index].path] : []
         })),
     };
 
@@ -43,6 +50,7 @@ export const createProduct = catchAsync(async (req, res, next) => {
         data: product,
     });
 });
+
 
 //lấy tất cả sản phẩm
 export const getAllProducts = catchAsync(async (req, res) => {
@@ -90,15 +98,20 @@ export const getProductById = catchAsync(async (req, res) => {
 //cập nhật sản phẩm
 
 export const updateProduct = catchAsync(async (req, res, next) => {
-
+    // Kiểm tra xem có tệp nào không
     if (!req.files || req.files.length === 0) {
-        return next(new AppError('Ảnh bìa sản phẩm là bắt buộc', 400));
+        return next(new AppError('Ít nhất một ảnh phải được cung cấp', 400));
     }
 
     // Lấy đường dẫn ảnh bìa từ file đầu tiên
     const coverImg = req.files[0].path;
 
     const { name, category, description, variants } = req.body;
+
+    // Kiểm tra các trường bắt buộc
+    if (!name || !category || !description || !variants || variants.length === 0) {
+        return next(new AppError('Tất cả các trường bắt buộc phải được cung cấp', 400));
+    }
 
     // Cập nhật thông tin sản phẩm
     const updatedProduct = await Product.findByIdAndUpdate(
@@ -108,17 +121,20 @@ export const updateProduct = catchAsync(async (req, res, next) => {
             category,
             description,
             coverImg,
-            variants: variants.map((variant) => ({
+            variants: variants.map((variant, index) => ({
                 ...variant,
-                images: req.files.map((file) => file.path),
+                images: req.files[index + 1] ? [req.files[index + 1].path] : [], // Sử dụng hình ảnh tương ứng nếu có
             })),
         },
         { new: true, runValidators: true }
     );
 
+    // Kiểm tra xem sản phẩm có được tìm thấy không
     if (!updatedProduct) {
         return next(new AppError('Không tìm thấy sản phẩm với ID này', 404));
     }
+
+    // Phản hồi thành công
     res.status(200).json({
         status: 'success',
         data: {
@@ -126,6 +142,10 @@ export const updateProduct = catchAsync(async (req, res, next) => {
         },
     });
 });
+
+
+
+
 //gợi ý sản phẩm theo danh mục
 export const relatedProduct = catchAsync(async (req, res, next) => {
     const product = await Product.find({
