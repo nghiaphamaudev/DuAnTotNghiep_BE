@@ -7,42 +7,47 @@ import { uploadProductImages } from "../middlewares/uploadCloud.middleware";
 
 
 export const createProduct = catchAsync(async (req, res, next) => {
-    if (!req.files || req.files.length === 0) {
+    // Kiểm tra và lấy ảnh bìa
+    const coverImage = req.files.coverImage ? req.files.coverImage[0] : null;
+    if (!coverImage) {
         console.log('No cover image found!');
         return next(new AppError('Ảnh bìa sản phẩm là bắt buộc', StatusCodes.BAD_REQUEST));
     }
 
     const { name, category, description, variants } = req.body;
 
+    // Kiểm tra các trường dữ liệu bắt buộc
     if (!name || !category || !description || !variants || variants.length === 0) {
         return next(new AppError('Tất cả các trường bắt buộc phải được cung cấp', StatusCodes.BAD_REQUEST));
     }
 
-    // Lấy đường dẫn ảnh bìa từ file đầu tiên
-    const coverImg = req.files[0].path;
+    // Tách ảnh của các biến thể
+    const variantImages0 = req.files['variants[0][images]'] || [];
+    const variantImages1 = req.files['variants[1][images]'] || [];
 
-    // Loại bỏ ảnh bìa khỏi danh sách ảnh còn lại
-    const remainingImages = req.files.slice(1);
+    // Nhóm ảnh biến thể theo từng biến thể
+    const imagesByVariant = {
+        0: variantImages0.map(file => file.path),
+        1: variantImages1.map(file => file.path),
+    };
 
-    // Chỉ giữ lại số ảnh bằng số biến thể
-    const variantImages = remainingImages.slice(0, variants.length);
-
-    // Tạo dữ liệu sản phẩm
+    // Chuẩn bị dữ liệu sản phẩm
     const productData = {
         name,
         category,
         description,
-        coverImg,
+        coverImg: coverImage.path, // Gán đường dẫn ảnh bìa
         variants: variants.map((variant, index) => ({
             ...variant,
-            // Gán ảnh cho từng biến thể, mỗi biến thể chỉ nhận một ảnh
-            images: variantImages[index] ? [variantImages[index].path] : []
+            // Gán các ảnh cho biến thể
+            images: imagesByVariant[index] || []
         })),
     };
 
     // Ghi log dữ liệu sản phẩm trước khi lưu
     console.log('Product data to be created:', productData);
 
+    // Tạo sản phẩm
     const product = await Product.create(productData);
 
     return res.status(StatusCodes.CREATED).json({
@@ -50,6 +55,7 @@ export const createProduct = catchAsync(async (req, res, next) => {
         data: product,
     });
 });
+
 
 
 //lấy tất cả sản phẩm
@@ -99,18 +105,20 @@ export const getProductById = catchAsync(async (req, res) => {
 
 export const updateProduct = catchAsync(async (req, res, next) => {
     // Kiểm tra xem có tệp nào không
-    if (!req.files || req.files.length === 0) {
-        return next(new AppError('Ít nhất một ảnh phải được cung cấp', 400));
-    }
+    const coverImage = req.files.coverImage ? req.files.coverImage[0] : null;
+    const variantImages0 = req.files['variants[0][images]'] || [];
+    const variantImages1 = req.files['variants[1][images]'] || [];
 
-    // Lấy đường dẫn ảnh bìa từ file đầu tiên
-    const coverImg = req.files[0].path;
+    // Lấy đường dẫn ảnh bìa
+    if (!coverImage) {
+        return next(new AppError('Ảnh bìa là bắt buộc', StatusCodes.BAD_REQUEST));
+    }
 
     const { name, category, description, variants } = req.body;
 
     // Kiểm tra các trường bắt buộc
     if (!name || !category || !description || !variants || variants.length === 0) {
-        return next(new AppError('Tất cả các trường bắt buộc phải được cung cấp', 400));
+        return next(new AppError('Tất cả các trường bắt buộc phải được cung cấp', StatusCodes.BAD_REQUEST));
     }
 
     // Cập nhật thông tin sản phẩm
@@ -120,10 +128,11 @@ export const updateProduct = catchAsync(async (req, res, next) => {
             name,
             category,
             description,
-            coverImg,
+            coverImg: coverImage.path, // Gán đường dẫn ảnh bìa
             variants: variants.map((variant, index) => ({
                 ...variant,
-                images: req.files[index + 1] ? [req.files[index + 1].path] : [], // Sử dụng hình ảnh tương ứng nếu có
+                // Gán các ảnh cho biến thể
+                images: index === 0 ? variantImages0.map(file => file.path) : variantImages1.map(file => file.path),
             })),
         },
         { new: true, runValidators: true }
@@ -131,17 +140,18 @@ export const updateProduct = catchAsync(async (req, res, next) => {
 
     // Kiểm tra xem sản phẩm có được tìm thấy không
     if (!updatedProduct) {
-        return next(new AppError('Không tìm thấy sản phẩm với ID này', 404));
+        return next(new AppError('Không tìm thấy sản phẩm với ID này', StatusCodes.NOT_FOUND));
     }
 
     // Phản hồi thành công
-    res.status(200).json({
+    res.status(StatusCodes.OK).json({
         status: 'success',
         data: {
             product: updatedProduct,
         },
     });
 });
+
 
 
 
