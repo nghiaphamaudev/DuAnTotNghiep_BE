@@ -63,9 +63,9 @@ export const getCategoriesBySeason = catchAsync(async (req, res, next) => {
     });
 });
 
-//lấy sản phẩm trong dung mục theo mùa
-export const getProductsByCategoryAndSeason = catchAsync(async (req, res, next) => {
-    const { id, season } = req.params;  // Lấy ID danh mục và mùa từ URL params
+//lấy sản phẩm trong dung mục 
+export const getProductsByCategory = catchAsync(async (req, res, next) => {
+    const { id } = req.params; // Lấy ID danh mục từ URL params
 
     // Tìm danh mục theo ID
     const category = await CategorySeason.findById(id);
@@ -73,11 +73,6 @@ export const getProductsByCategoryAndSeason = catchAsync(async (req, res, next) 
     // Kiểm tra danh mục
     if (!category) {
         return next(new AppError('The category ID does not exist!', StatusCodes.NOT_FOUND));
-    }
-
-    // Kiểm tra mùa có khớp với mùa của danh mục không
-    if (category.season !== season) {
-        return next(new AppError('The category does not belong to this season!', StatusCodes.BAD_REQUEST));
     }
 
     // Lấy tất cả sản phẩm thuộc danh mục
@@ -92,6 +87,7 @@ export const getProductsByCategoryAndSeason = catchAsync(async (req, res, next) 
         products,
     });
 });
+
 
 //xóa danh mục
 export const deleteCategorySeason = catchAsync(async (req, res, next) => {

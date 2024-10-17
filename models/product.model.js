@@ -10,7 +10,7 @@ const productSchema = new mongoose.Schema(
     },
     category: {
       type: mongoose.Schema.ObjectId,
-      ref: 'Category',
+      ref: 'CategorySeason',
     },
     coverImg: {
       type: String,
