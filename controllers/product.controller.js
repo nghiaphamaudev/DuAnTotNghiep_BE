@@ -2,6 +2,7 @@ import Product from "../models/product.model";
 import { StatusCodes } from "http-status-codes";
 import catchAsync from "../utils/catchAsync.util";
 import AppError from "../utils/appError.util";
+import CategorySeason from "../models/categorySeason.model";
 import { productSchema } from '../validator/products.validator';
 import { uploadProductImages } from "../middlewares/uploadCloud.middleware";
 
@@ -61,18 +62,21 @@ export const createProduct = catchAsync(async (req, res, next) => {
 //lấy tất cả sản phẩm
 export const getAllProducts = catchAsync(async (req, res) => {
     const { _page = 1, _limit = 10, _sort = "createdAt", _order = "asc", _expand } = req.query;
+
     const options = {
         page: _page,
         limit: _limit,
         sort: { [_sort]: _order === "desc" ? -1 : 1 },
     };
-    const populateOptions = _expand ? [{ path: "category", select: "name" }] : [];
+
+    const populateOptions = _expand ? { path: "category", select: "name" } : null;
 
     const result = await Product.paginate(
-        { categoryId: null },
+        {},
         { ...options, populate: populateOptions }
     );
 
+    // Kiểm tra nếu không có sản phẩm nào được tìm thấy
     if (result.docs.length === 0) {
         return res.status(StatusCodes.OK).json({ data: [] });
     }
@@ -89,9 +93,13 @@ export const getAllProducts = catchAsync(async (req, res) => {
     return res.status(StatusCodes.OK).json(response);
 });
 
+
+
+
+
 //lấy chi tiết sản phẩm
 export const getProductById = catchAsync(async (req, res) => {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findById(req.params.id).populate('category', 'name');
 
     if (!product) {
         // Nếu không tìm thấy sản phẩm
