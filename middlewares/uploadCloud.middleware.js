@@ -24,6 +24,8 @@ const userStorage = new CloudinaryStorage({
   },
 });
 
+
+
 // Tạo storage cho Product (cho phép upload tối đa 4 ảnh)
 const productStorage = new CloudinaryStorage({
   cloudinary: cloudinary.v2,
@@ -34,14 +36,17 @@ const productStorage = new CloudinaryStorage({
   },
 });
 
-// Middleware cho user, chỉ cho phép upload 1 ảnh
-const uploadUserCloud = multer({ storage: userStorage }).single('image');
+
 
 // Middleware cho product, cho phép upload tối đa 4 ảnh
-const uploadProductCloud = multer({ storage: productStorage }).array(
-  'images',
-  4
-);
+const uploadProductCloud = multer({ storage: productStorage }).fields([
+  { name: 'coverImage', maxCount: 1 },
+  { name: 'variants[0][images]', maxCount: 4 }, // 4 ảnh cho biến thể đầu tiên
+  { name: 'variants[1][images]', maxCount: 4 }, // 4 ảnh cho biến thể thứ hai
+]);
+
+// Middleware cho user, chỉ cho phép upload 1 ảnh
+const uploadUserCloud = multer({ storage: userStorage }).single('image');
 
 // Xuất middleware
 export const uploadUserImage = uploadUserCloud;
