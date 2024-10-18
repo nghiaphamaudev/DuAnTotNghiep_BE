@@ -18,7 +18,6 @@ const productSchema = new mongoose.Schema(
     },
     ratingAverage: {
       type: Number,
-      require: false,
       default: 0,
     },
     variants: [
@@ -38,6 +37,9 @@ const productSchema = new mongoose.Schema(
               type: Number,
               required: true,
             },
+            discountedPrice: {
+              type: Number,
+            },
             inventory: {
               type: Number,
               required: true,
@@ -47,10 +49,14 @@ const productSchema = new mongoose.Schema(
         ],
       },
     ],
-
+    discountPercentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
+    },
     ratingQuantity: {
       type: Number,
-      required: false,
       default: 0,
     },
     description: {
@@ -70,6 +76,7 @@ const productSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
 productSchema.plugin(mongoosePaginate);
 const Product = mongoose.model('Product', productSchema);
 export default Product;

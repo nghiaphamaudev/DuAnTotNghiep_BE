@@ -37,11 +37,16 @@ export const createProduct = catchAsync(async (req, res, next) => {
         name,
         category,
         description,
-        coverImg: coverImage.path, // Gán đường dẫn ảnh bìa
+        coverImg: coverImage.path,
         variants: variants.map((variant, index) => ({
             ...variant,
             // Gán các ảnh cho biến thể
-            images: imagesByVariant[index] || []
+            images: imagesByVariant[index] || [],
+            // Gán discountedPrice bằng với price cho từng size
+            sizes: variant.sizes.map(size => ({
+                ...size,
+                discountedPrice: size.price, // Đặt discountedPrice bằng với price
+            })),
         })),
     };
 
@@ -56,7 +61,6 @@ export const createProduct = catchAsync(async (req, res, next) => {
         data: product,
     });
 });
-
 
 
 //lấy tất cả sản phẩm
@@ -94,9 +98,6 @@ export const getAllProducts = catchAsync(async (req, res) => {
 });
 
 
-
-
-
 //lấy chi tiết sản phẩm
 export const getProductById = catchAsync(async (req, res) => {
     const product = await Product.findById(req.params.id).populate('category', 'name');
@@ -112,46 +113,50 @@ export const getProductById = catchAsync(async (req, res) => {
 //cập nhật sản phẩm
 
 export const updateProduct = catchAsync(async (req, res, next) => {
-    // Kiểm tra xem có tệp nào không
     const coverImage = req.files.coverImage ? req.files.coverImage[0] : null;
     const variantImages0 = req.files['variants[0][images]'] || [];
     const variantImages1 = req.files['variants[1][images]'] || [];
 
-    // Lấy đường dẫn ảnh bìa
     if (!coverImage) {
         return next(new AppError('Ảnh bìa là bắt buộc', StatusCodes.BAD_REQUEST));
     }
 
-    const { name, category, description, variants } = req.body;
+    const { name, category, description, variants, discountPercentage } = req.body;
 
-    // Kiểm tra các trường bắt buộc
     if (!name || !category || !description || !variants || variants.length === 0) {
         return next(new AppError('Tất cả các trường bắt buộc phải được cung cấp', StatusCodes.BAD_REQUEST));
     }
 
-    // Cập nhật thông tin sản phẩm
+    // Chuyển đổi discountPercentage sang số
+    const discountPercent = parseFloat(discountPercentage) || 0; // Nếu không phải số, gán giá trị 0
+
     const updatedProduct = await Product.findByIdAndUpdate(
         req.params.id,
         {
             name,
             category,
             description,
-            coverImg: coverImage.path, // Gán đường dẫn ảnh bìa
+            coverImg: coverImage.path,
             variants: variants.map((variant, index) => ({
                 ...variant,
-                // Gán các ảnh cho biến thể
                 images: index === 0 ? variantImages0.map(file => file.path) : variantImages1.map(file => file.path),
+                sizes: variant.sizes.map(size => {
+                    // Tính toán discountedPrice nếu có discountPercentage
+                    if (size.price) {
+                        size.discountedPrice = size.price - (size.price * (discountPercent / 100));
+                    }
+                    return size;
+                }),
             })),
+            discountPercentage: discountPercent, // Cập nhật discountPercentage
         },
         { new: true, runValidators: true }
     );
 
-    // Kiểm tra xem sản phẩm có được tìm thấy không
     if (!updatedProduct) {
         return next(new AppError('Không tìm thấy sản phẩm với ID này', StatusCodes.NOT_FOUND));
     }
 
-    // Phản hồi thành công
     res.status(StatusCodes.OK).json({
         status: 'success',
         data: {
@@ -159,7 +164,6 @@ export const updateProduct = catchAsync(async (req, res, next) => {
         },
     });
 });
-
 
 
 
@@ -177,6 +181,7 @@ export const relatedProduct = catchAsync(async (req, res, next) => {
     });
 });
 
+
 export const deleteProduct = catchAsync(async (req, res, next) => {
     const product = await Product.findByIdAndDelete(req.params.id);
     if (!product) {
@@ -187,6 +192,8 @@ export const deleteProduct = catchAsync(async (req, res, next) => {
         data: product,
     });
 });
+
+
 
 export const deleteProductStatus = catchAsync(async (req, res, next) => {
     const product = await Product.findByIdAndUpdate(
