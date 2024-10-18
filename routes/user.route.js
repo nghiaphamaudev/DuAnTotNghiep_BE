@@ -22,6 +22,8 @@ import {
   toggleBlockUserById,
   updateAddress,
   updateMe,
+  getMe,
+  getUserById,
   updateStatusAddress,
 } from '../controllers/user.controller';
 const userRouter = express.Router({ mergeParams: true });
@@ -38,6 +40,7 @@ userRouter.use(protect);
 userRouter.patch('/auth/updatePassword', updatePassword);
 userRouter.patch('/deleteMe', deleteMe);
 userRouter.patch('/updateMe', restrictTo('user'), uploadUserImage, updateMe);
+userRouter.get('/getMe', getMe, getUserById);
 
 userRouter.post('/address', addAddress);
 userRouter.patch('/address/:addressId', updateAddress);

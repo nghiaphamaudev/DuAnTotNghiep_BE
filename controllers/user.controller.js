@@ -23,7 +23,7 @@ export const deleteMe = catchAsync(async (req, res, next) => {
 });
 
 export const getMe = (req, res, next) => {
-  req.params.id = req.user._id;
+  req.params.userId = req.user.id;
   next();
 };
 
