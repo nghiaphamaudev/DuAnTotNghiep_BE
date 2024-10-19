@@ -110,6 +110,7 @@ export const getProductById = catchAsync(async (req, res) => {
     return res.status(StatusCodes.OK).json(product);
 });
 
+
 //cập nhật sản phẩm
 
 export const updateProduct = catchAsync(async (req, res, next) => {

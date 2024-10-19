@@ -10,7 +10,7 @@ const productSchema = new mongoose.Schema(
     },
     category: {
       type: mongoose.Schema.ObjectId,
-      ref: 'CategorySeason',
+      ref: 'Category',
     },
     coverImg: {
       type: String,
@@ -70,8 +70,7 @@ const productSchema = new mongoose.Schema(
     },
   },
   {
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
+
     versionKey: false,
     timestamps: true,
   }
