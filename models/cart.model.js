@@ -29,8 +29,6 @@ const cartSchema = new mongoose.Schema(
     },
   },
   {
-    toObject: { virtuals: true },
-    toJSON: { virtuals: true },
     versionKey: false,
     timestamps: true,
   }
