@@ -4,7 +4,7 @@ import User from '../models/user.model';
 import crypto from 'crypto';
 import { StatusCodes } from 'http-status-codes';
 import cloudinary from '../configs/cloudiary.config';
-import { updateMeSchema } from '../validator/user.validator';
+import { updateMeSchema, addAddressSchema } from '../validator/user.validator';
 
 // Check lại mật khẩu user nhập vào có đúng mới xóa
 export const deleteMe = catchAsync(async (req, res, next) => {
@@ -102,14 +102,39 @@ export const updateMe = catchAsync(async (req, res, next) => {
 export const addAddress = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
   let isDefault = false;
-  const { name, phone, address } = req.body;
+  const {
+    nameReceiver,
+    phoneNumberReceiver,
+    addressReceiver,
+    detailAddressReceiver,
+  } = req.body;
+  //Validate từ form
+  const { error } = addAddressSchema.validate(
+    {
+      nameReceiver,
+      phoneNumberReceiver,
+      addressReceiver,
+      detailAddressReceiver,
+    },
+    { abortEarly: false }
+  );
+  if (error) {
+    const messages = error.details.map((item) => item.message);
+    return res.status(StatusCodes.BAD_REQUEST).json({ messages });
+  }
   if (currentUser.addresses.length === 0) {
     isDefault = true;
   }
 
   const newAddress = [
     ...currentUser.addresses,
-    { name, phone, address, isDefault },
+    {
+      nameReceiver,
+      phoneNumberReceiver,
+      addressReceiver,
+      detailAddressReceiver,
+      isDefault,
+    },
   ];
   //Add new address
   const addresses = await User.findByIdAndUpdate(
@@ -128,12 +153,36 @@ export const addAddress = catchAsync(async (req, res, next) => {
 export const updateAddress = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
   const idAddress = req.params.addressId;
-  const { name, phone, address } = req.body;
-
+  const {
+    nameReceiver,
+    phoneNumberReceiver,
+    addressReceiver,
+    detailAddressReceiver,
+  } = req.body;
+  //Validate từ form
+  const { error } = addAddressSchema.validate(
+    {
+      nameReceiver,
+      phoneNumberReceiver,
+      addressReceiver,
+      detailAddressReceiver,
+    },
+    { abortEarly: false }
+  );
+  if (error) {
+    const messages = error.details.map((item) => item.message);
+    return res.status(StatusCodes.BAD_REQUEST).json({ messages });
+  }
   // tìm và cập nhật địa chỉ
   const updatedAddresses = currentUser.addresses.map((addr) =>
     addr._id.toString() === idAddress
-      ? { ...addr.toObject(), name, phone, address }
+      ? {
+          ...addr.toObject(),
+          nameReceiver,
+          phoneNumberReceiver,
+          addressReceiver,
+          detailAddressReceiver,
+        }
       : addr
   );
 
@@ -199,7 +248,16 @@ export const deleteAddress = catchAsync(async (req, res, next) => {
       .json({ message: 'Người dùng không tồn tại' });
   }
 
-  // Lọc ra danh sách địa chỉ mà không chứa địa chỉ cần xóa
+  // Kiểm tra xem địa chỉ có tồn tại trong danh sách của người dùng không
+  const addressExists = user.addresses.some(
+    (address) => address._id.toString() === addressId
+  );
+
+  if (!addressExists) {
+    return next(new AppError('Địa chỉ không tồn tại!', StatusCodes.NOT_FOUND));
+  }
+
+  // Lọc ra các địa chỉ không phải là địa chỉ cần xóa
   user.addresses = user.addresses.filter(
     (address) => address._id.toString() !== addressId
   );

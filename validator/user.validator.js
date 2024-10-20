@@ -6,6 +6,29 @@ const fullNameSchema = Joi.string().min(7).max(50).required().messages({
   'string.max': 'Họ tên không được vượt quá {#limit} ký tự',
   'any.required': 'Họ tên là bắt buộc',
 });
+const nameSchema = Joi.string().min(7).max(50).required().messages({
+  'string.empty': 'Họ tên không được để trống',
+  'string.min': 'Họ tên phải có ít nhất {#limit} ký tự',
+  'string.max': 'Họ tên không được vượt quá {#limit} ký tự',
+  'any.required': 'Tên là bắt buộc',
+});
+const addressSchema = Joi.object({
+  street: Joi.string().required().label('Street'),
+  city: Joi.string().required().label('City'),
+  state: Joi.string().optional().label('State'),
+  zipCode: Joi.string()
+    .pattern(/^\d{5}(-\d{4})?$/)
+    .required()
+    .label('Zip Code'),
+  country: Joi.string().default('Vietnam').label('Country'),
+});
+
+const detailAddressSchema = Joi.string().min(9).max(50).required().messages({
+  'string.empty': 'Địa chỉ không được để trống',
+  'string.min': 'Địa chỉ cụ thể phải có ít nhất {#limit} ký tự',
+  'string.max': 'Địa chỉ cụ thể không được vượt quá {#limit} ký tự',
+  'any.required': 'Địa chỉ cụ thể là bắt buộc',
+});
 
 const emailSchema = Joi.string().email().required().messages({
   'string.empty': 'Email không được để trống',
@@ -64,4 +87,11 @@ export const resetPasswordSchema = Joi.object({
 export const updateMeSchema = Joi.object({
   fullName: fullNameSchema,
   phoneNumber: phoneNumberSchema,
+});
+
+export const addAddressSchema = Joi.object({
+  nameReceiver: nameSchema,
+  phoneNumberReceiver: phoneNumberSchema,
+  addressReceiver: addressSchema.required().label('Address Receiver'),
+  detailAddressReceiver: detailAddressSchema,
 });

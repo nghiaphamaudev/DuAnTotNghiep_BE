@@ -32,9 +32,16 @@ const userSchema = new mongoose.Schema(
     },
     addresses: [
       {
-        name: String,
-        phone: String,
-        address: String,
+        nameReceiver: String,
+        phoneNumberReceiver: String,
+        addressReceiver: {
+          street: { type: String, required: true },
+          city: { type: String, required: true },
+          state: { type: String },
+          zipCode: { type: String, required: true },
+          country: { type: String, default: 'Vietnam' },
+        },
+        detailAddressReceiver: String,
         isDefault: Boolean,
       },
     ],
