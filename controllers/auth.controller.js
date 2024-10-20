@@ -34,9 +34,10 @@ const createSendRes = (user, statusCode, res) => {
   res.cookie('jwt', token, cookieOptions);
   user.password = undefined;
   res.status(statusCode).json({
-    status: 'success',
+    ok: true,
     data: user,
     accessToken: token,
+    message: 'Thành công',
   });
 };
 
@@ -63,7 +64,10 @@ export const register = catchAsync(async (req, res, next) => {
     );
   }
   const newUser = await User.create({ email, fullName, password, phoneNumber });
-  createSendRes(newUser, StatusCodes.CREATED, res);
+  res.status(StatusCodes.OK).json({
+    ok: true,
+    message: 'Thành công',
+  });
 });
 
 export const login = catchAsync(async (req, res, next) => {
