@@ -12,15 +12,30 @@ const nameSchema = Joi.string().min(7).max(50).required().messages({
   'string.max': 'Họ tên không được vượt quá {#limit} ký tự',
   'any.required': 'Tên là bắt buộc',
 });
-const addressSchema = Joi.object({
-  street: Joi.string().required().label('Street'),
-  city: Joi.string().required().label('City'),
-  state: Joi.string().optional().label('State'),
-  zipCode: Joi.string()
-    .pattern(/^\d{5}(-\d{4})?$/)
-    .required()
-    .label('Zip Code'),
-  country: Joi.string().default('Vietnam').label('Country'),
+
+// Định nghĩa schema cho từng phần của địa chỉ
+const addressPartSchema = Joi.object({
+  code: Joi.string().required().messages({
+    'string.empty': 'Mã không được để trống',
+    'any.required': 'Mã là bắt buộc',
+  }),
+  name: Joi.string().required().messages({
+    'string.empty': 'Tên không được để trống',
+    'any.required': 'Tên là bắt buộc',
+  }),
+});
+
+// Schema cho toàn bộ địa chỉ
+const addressReceiverSchema = Joi.object({
+  province: addressPartSchema.required().messages({
+    'any.required': 'Tỉnh/Thành phố là bắt buộc',
+  }),
+  district: addressPartSchema.required().messages({
+    'any.required': 'Quận/Huyện là bắt buộc',
+  }),
+  ward: addressPartSchema.required().messages({
+    'any.required': 'Phường/Xã là bắt buộc',
+  }),
 });
 
 const detailAddressSchema = Joi.string().min(9).max(50).required().messages({
@@ -92,6 +107,6 @@ export const updateMeSchema = Joi.object({
 export const addAddressSchema = Joi.object({
   nameReceiver: nameSchema,
   phoneNumberReceiver: phoneNumberSchema,
-  addressReceiver: addressSchema.required().label('Address Receiver'),
+  addressReceiver: addressReceiverSchema.required().label('Address Receiver'),
   detailAddressReceiver: detailAddressSchema,
 });

@@ -35,11 +35,18 @@ const userSchema = new mongoose.Schema(
         nameReceiver: String,
         phoneNumberReceiver: String,
         addressReceiver: {
-          street: { type: String, required: true },
-          city: { type: String, required: true },
-          state: { type: String },
-          zipCode: { type: String, required: true },
-          country: { type: String, default: 'Vietnam' },
+          province: {
+            code: { type: String, required: true },
+            name: { type: String, required: true },
+          },
+          district: {
+            code: { type: String, required: true },
+            name: { type: String, required: true },
+          },
+          ward: {
+            code: { type: String, required: true },
+            name: { type: String, required: true },
+          },
         },
         detailAddressReceiver: String,
         isDefault: Boolean,
@@ -53,6 +60,7 @@ const userSchema = new mongoose.Schema(
           ref: 'Laptop',
         },
       },
+      { _id: false }, // Tắt _id cho mỗi phần tử trong favoriteProduct
     ],
     password: {
       type: String,

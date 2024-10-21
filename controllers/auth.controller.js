@@ -53,17 +53,22 @@ export const register = catchAsync(async (req, res, next) => {
     return res.status(StatusCodes.BAD_REQUEST).json({ messages });
   }
 
-  //Check email tồn tại
-  const existedUser = await User.findOne({ email });
+  // kiểm tra email đã tồn tại chưa
+  const existedUser = await User.findOne({
+    $or: [{ email }, { phoneNumber }],
+  });
+
   if (existedUser) {
+    const conflictField =
+      existedUser.email === email ? 'Email' : 'Số điện thoại';
     return next(
       new AppError(
-        'Email đã tồn tại, vui lòng sử dụng email khác!',
+        `${conflictField} đã được đăng ký, vui lòng sử dụng ${conflictField.toLowerCase()} khác!`,
         StatusCodes.BAD_REQUEST
       )
     );
   }
-  const newUser = await User.create({ email, fullName, password, phoneNumber });
+  await User.create({ email, fullName, password, phoneNumber });
   res.status(StatusCodes.OK).json({
     ok: true,
     message: 'Thành công',

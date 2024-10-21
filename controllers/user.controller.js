@@ -101,14 +101,14 @@ export const updateMe = catchAsync(async (req, res, next) => {
 
 export const addAddress = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
-  let isDefault = false;
   const {
     nameReceiver,
     phoneNumberReceiver,
     addressReceiver,
     detailAddressReceiver,
   } = req.body;
-  //Validate từ form
+
+  // Validate dữ liệu từ form
   const { error } = addAddressSchema.validate(
     {
       nameReceiver,
@@ -118,35 +118,38 @@ export const addAddress = catchAsync(async (req, res, next) => {
     },
     { abortEarly: false }
   );
+
   if (error) {
     const messages = error.details.map((item) => item.message);
     return res.status(StatusCodes.BAD_REQUEST).json({ messages });
   }
-  if (currentUser.addresses.length === 0) {
-    isDefault = true;
+
+  // Kiểm tra xem địa chỉ mới có phải là địa chỉ mặc định không
+  const isDefault = currentUser.addresses.length === 0;
+
+  // Tạo địa chỉ mới
+  const newAddress = {
+    nameReceiver,
+    phoneNumberReceiver,
+    addressReceiver,
+    detailAddressReceiver,
+    isDefault,
+  };
+
+  // Nếu địa chỉ mới là mặc định, bỏ dấu mặc định của các địa chỉ cũ
+  if (isDefault) {
+    currentUser.addresses.forEach((address) => (address.isDefault = false));
   }
 
-  const newAddress = [
-    ...currentUser.addresses,
-    {
-      nameReceiver,
-      phoneNumberReceiver,
-      addressReceiver,
-      detailAddressReceiver,
-      isDefault,
-    },
-  ];
-  //Add new address
-  const addresses = await User.findByIdAndUpdate(
-    currentUser._id,
-    { addresses: newAddress },
-    {
-      new: true,
-    }
-  );
+  // Thêm địa chỉ mới vào danh sách
+  currentUser.addresses.push(newAddress);
+
+  // Lưu thay đổi vào database
+  await currentUser.save();
+
   res.status(StatusCodes.OK).json({
     status: 'success',
-    data: addresses,
+    data: currentUser.addresses,
   });
 });
 
@@ -159,7 +162,8 @@ export const updateAddress = catchAsync(async (req, res, next) => {
     addressReceiver,
     detailAddressReceiver,
   } = req.body;
-  //Validate từ form
+
+  // Validate dữ liệu từ request body
   const { error } = addAddressSchema.validate(
     {
       nameReceiver,
@@ -169,32 +173,37 @@ export const updateAddress = catchAsync(async (req, res, next) => {
     },
     { abortEarly: false }
   );
+
   if (error) {
     const messages = error.details.map((item) => item.message);
     return res.status(StatusCodes.BAD_REQUEST).json({ messages });
   }
-  // tìm và cập nhật địa chỉ
-  const updatedAddresses = currentUser.addresses.map((addr) =>
-    addr._id.toString() === idAddress
-      ? {
-          ...addr.toObject(),
-          nameReceiver,
-          phoneNumberReceiver,
-          addressReceiver,
-          detailAddressReceiver,
-        }
-      : addr
+
+  // Tìm địa chỉ cần cập nhật
+  const addressIndex = currentUser.addresses.findIndex(
+    (addr) => addr._id.toString() === idAddress
   );
 
-  const user = await User.findByIdAndUpdate(
-    currentUser._id,
-    { addresses: updatedAddresses },
-    { new: true }
-  );
+  if (addressIndex === -1) {
+    return next(new AppError('Địa chỉ không tồn tại', StatusCodes.NOT_FOUND));
+  }
+
+  // Cập nhật địa chỉ
+  currentUser.addresses[addressIndex] = {
+    _id: currentUser.addresses[addressIndex]._id, // Giữ lại _id
+    nameReceiver,
+    phoneNumberReceiver,
+    addressReceiver,
+    detailAddressReceiver,
+    isDefault: currentUser.addresses[addressIndex].isDefault,
+  };
+
+  // Lưu thay đổi vào database
+  await currentUser.save();
 
   res.status(StatusCodes.OK).json({
     status: 'success',
-    data: user.addresses,
+    data: currentUser.addresses,
   });
 });
 
