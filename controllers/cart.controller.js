@@ -29,6 +29,9 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
         return next(new AppError('Size not found', 404));
     }
 
+    // Lấy ảnh đầu tiên của biến thể
+    const variantImage = variant.images && variant.images.length > 0 ? variant.images[0] : null;
+
     // Kiểm tra nếu sản phẩm và size đã tồn tại trong giỏ hàng của người dùng
     let cartItem = await Cart.findOne({ userId, productId, variantId, sizeId });
 
@@ -44,8 +47,14 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
             variantId,
             sizeId,
             quantity: quantity || 1,
+            image: variantImage
         });
     }
+
+    // console.log("Product Info:", product); // Thông tin sản phẩm
+    // console.log("Variant Info:", variant); // Thông tin biến thể
+    // console.log("Size Info:", size); // Thông tin kích thước
+    // console.log("Cart Item:", cartItem); // Dữ liệu giỏ hàng
 
     res.status(201).json({
         status: 'success',
@@ -55,11 +64,14 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
             variantId: cartItem.variantId,
             sizeId: cartItem.sizeId,
             quantity: cartItem.quantity,
+            image: variantImage,
             createdAt: cartItem.createdAt,
             updatedAt: cartItem.updatedAt
         }
     });
 });
+
+
 
 
 export const getUserCart = catchAsync(async (req, res, next) => {
@@ -73,21 +85,44 @@ export const getUserCart = catchAsync(async (req, res, next) => {
         return next(new AppError('No items found in the cart!', 404));
     }
 
-    // Trả về userId và danh sách sản phẩm trong giỏ hàng
-    res.status(200).json({
-        status: 'success',
-        userId: userId, // Trả về userId từ params
-        cartItems: cartItems.map(item => ({
+    // Tạo một mảng để chứa thông tin giỏ hàng với ảnh
+    const cartItemsWithImages = await Promise.all(cartItems.map(async (item) => {
+        // Lấy sản phẩm dựa trên productId
+        const product = await Product.findById(item.productId);
+
+        if (!product) {
+            return next(new AppError('Product not found', 404));
+        }
+
+        // Lấy biến thể (variant) của sản phẩm
+        const variant = product.variants.id(item.variantId);
+        if (!variant) {
+            return next(new AppError('Variant not found', 404));
+        }
+
+        // Lấy ảnh đầu tiên của biến thể
+        const variantImage = variant.images && variant.images.length > 0 ? variant.images[0] : null;
+
+        return {
             _id: item._id,
             productId: item.productId,
             variantId: item.variantId,
             sizeId: item.sizeId,
             quantity: item.quantity,
+            image: variantImage,
             createdAt: item.createdAt,
-            updatedAt: item.updatedAt
-        })),
+            updatedAt: item.updatedAt,
+        };
+    }));
+
+    // Trả về userId và danh sách sản phẩm trong giỏ hàng
+    res.status(200).json({
+        status: 'success',
+        userId: userId,
+        cartItems: cartItemsWithImages,
     });
 });
+
 
 export const removeCartItem = catchAsync(async (req, res, next) => {
     const { userId, cartItemId } = req.body;
