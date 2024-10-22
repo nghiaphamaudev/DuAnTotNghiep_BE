@@ -10,6 +10,7 @@ import userRouter from './routes/user.route.js';
 import productRouter from './routes/product.route.js';
 import categorySeasonRouter from './routes/categorySeason.router.js';
 import cartRouter from './routes/cart.route.js';
+import feedbackRouter from './routes/feedback.router.js';
 
 
 const app = express();
@@ -32,7 +33,7 @@ app.use('/api/v1/season', categorySeasonRouter);
 app.use('/api/v1/products', productRouter);
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/cart', cartRouter);
-
+app.use('/api/v1/feedback', feedbackRouter)
 app.all('*', (req, res, next) => {
   return next(
     new AppError(

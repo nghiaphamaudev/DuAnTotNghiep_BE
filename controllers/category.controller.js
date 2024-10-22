@@ -2,6 +2,7 @@ import catchAsync from '../utils/catchAsync.util';
 import Category from '../models/category.model';
 import AppError from '../utils/appError.util';
 
+
 export const getAllCategory = catchAsync(async (req, res, next) => {
   const categories = await Category.find();
   return res.status(200).json({
