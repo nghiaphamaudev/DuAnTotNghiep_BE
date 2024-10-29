@@ -2,11 +2,9 @@ import Product from "../models/product.model";
 import { StatusCodes } from "http-status-codes";
 import catchAsync from "../utils/catchAsync.util";
 import AppError from "../utils/appError.util";
-import CategorySeason from "../models/categorySeason.model";
-import { productSchema } from '../validator/products.validator';
-import { uploadProductImages } from "../middlewares/uploadCloud.middleware";
+import Category from "../models/category.model"
 
-
+//thêm sản phẩm 
 export const createProduct = catchAsync(async (req, res, next) => {
     // Kiểm tra và lấy ảnh bìa
     const coverImage = req.files.coverImage ? req.files.coverImage[0] : null;
@@ -20,6 +18,12 @@ export const createProduct = catchAsync(async (req, res, next) => {
     // Kiểm tra các trường dữ liệu bắt buộc
     if (!name || !category || !description || !variants || variants.length === 0) {
         return next(new AppError('Tất cả các trường bắt buộc phải được cung cấp', StatusCodes.BAD_REQUEST));
+    }
+
+    // Kiểm tra xem category có tồn tại không
+    const existingCategory = await Category.findById(category);
+    if (!existingCategory) {
+        return next(new AppError('Category không tồn tại', StatusCodes.BAD_REQUEST));
     }
 
     // Tách ảnh của các biến thể
@@ -63,39 +67,73 @@ export const createProduct = catchAsync(async (req, res, next) => {
 });
 
 
+
 //lấy tất cả sản phẩm
 export const getAllProducts = catchAsync(async (req, res) => {
-    const { _page = 1, _limit = 10, _sort = "createdAt", _order = "asc", _expand } = req.query;
+    const { _page = 1, _limit = 10, _sort = "createdAt", _order = "asc" } = req.query;
 
-    const options = {
-        page: _page,
-        limit: _limit,
-        sort: { [_sort]: _order === "desc" ? -1 : 1 },
-    };
+    const sortOrder = _order === "desc" ? -1 : 1;
+    const pageNumber = parseInt(_page);
+    const pageSize = parseInt(_limit);
 
-    const populateOptions = _expand ? { path: "category", select: "name" } : null;
-
-    const result = await Product.paginate(
-        {},
-        { ...options, populate: populateOptions }
-    );
+    // Sử dụng $lookup để thực hiện join với Category và hiển thị trống nếu không tồn tại
+    const products = await Product.aggregate([
+        {
+            $lookup: {
+                from: "categories",
+                localField: "category",
+                foreignField: "_id",
+                as: "categoryInfo"
+            }
+        },
+        {
+            $unwind: {
+                path: "$categoryInfo",
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $addFields: {
+                category: { $ifNull: ["$categoryInfo.name", ""] }
+            }
+        },
+        {
+            $sort: { [_sort]: sortOrder }
+        },
+        {
+            $skip: (pageNumber - 1) * pageSize
+        },
+        {
+            $limit: pageSize
+        },
+        {
+            $project: {
+                categoryInfo: 0
+            }
+        }
+    ]);
 
     // Kiểm tra nếu không có sản phẩm nào được tìm thấy
-    if (result.docs.length === 0) {
+    if (products.length === 0) {
         return res.status(StatusCodes.OK).json({ data: [] });
     }
 
+    const totalItems = await Product.countDocuments();
+    const totalPages = Math.ceil(totalItems / pageSize);
+
     const response = {
-        data: result.docs,
+        data: products,
         pagination: {
-            currentPage: result.page,
-            totalPages: result.totalPages,
-            totalItems: result.totalDocs,
+            currentPage: pageNumber,
+            totalPages,
+            totalItems,
         },
     };
 
     return res.status(StatusCodes.OK).json(response);
 });
+
+
 
 
 //lấy chi tiết sản phẩm
@@ -128,8 +166,14 @@ export const updateProduct = catchAsync(async (req, res, next) => {
         return next(new AppError('Tất cả các trường bắt buộc phải được cung cấp', StatusCodes.BAD_REQUEST));
     }
 
+    // Kiểm tra xem category có tồn tại hay không
+    const categoryExists = await Category.findById(category);
+    if (!categoryExists) {
+        return next(new AppError('Category không hợp lệ hoặc đã bị xóa', StatusCodes.BAD_REQUEST));
+    }
+
     // Chuyển đổi discountPercentage sang số
-    const discountPercent = parseFloat(discountPercentage) || 0; // Nếu không phải số, gán giá trị 0
+    const discountPercent = parseFloat(discountPercentage) || 0;
 
     const updatedProduct = await Product.findByIdAndUpdate(
         req.params.id,
@@ -142,14 +186,13 @@ export const updateProduct = catchAsync(async (req, res, next) => {
                 ...variant,
                 images: index === 0 ? variantImages0.map(file => file.path) : variantImages1.map(file => file.path),
                 sizes: variant.sizes.map(size => {
-                    // Tính toán discountedPrice nếu có discountPercentage
                     if (size.price) {
                         size.discountedPrice = size.price - (size.price * (discountPercent / 100));
                     }
                     return size;
                 }),
             })),
-            discountPercentage: discountPercent, // Cập nhật discountPercentage
+            discountPercentage: discountPercent,
         },
         { new: true, runValidators: true }
     );
@@ -169,20 +212,25 @@ export const updateProduct = catchAsync(async (req, res, next) => {
 
 
 
+
 //gợi ý sản phẩm theo danh mục
 export const relatedProduct = catchAsync(async (req, res, next) => {
-    const product = await Product.find({
+    const products = await Product.find({
         category: req.params.categoryId,
         _id: { $ne: req.params.productId },
+    }).populate({
+        path: 'category',
+        select: 'name',
     });
 
     return res.status(StatusCodes.OK).json({
         status: 'success',
-        data: product,
+        data: products,
     });
 });
 
 
+//xóa sản phẩm
 export const deleteProduct = catchAsync(async (req, res, next) => {
     const product = await Product.findByIdAndDelete(req.params.id);
     if (!product) {
@@ -195,7 +243,7 @@ export const deleteProduct = catchAsync(async (req, res, next) => {
 });
 
 
-
+// đổi trạng thái sản phẩm
 export const deleteProductStatus = catchAsync(async (req, res, next) => {
     const product = await Product.findByIdAndUpdate(
         req.params.id,
