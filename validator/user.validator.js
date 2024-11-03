@@ -13,15 +13,16 @@ const nameSchema = Joi.string().min(7).max(50).required().messages({
   'any.required': 'Tên là bắt buộc',
 });
 
+const addressSchema = Joi.string().required().messages({
+  'string.empty': 'Địa chỉ không được để trống',
+  'any.required': 'Địa chỉ là bắt buộc',
+});
+
 // Định nghĩa schema cho từng phần của địa chỉ
 const addressPartSchema = Joi.object({
   code: Joi.string().required().messages({
     'string.empty': 'Mã không được để trống',
     'any.required': 'Mã là bắt buộc',
-  }),
-  name: Joi.string().required().messages({
-    'string.empty': 'Tên không được để trống',
-    'any.required': 'Tên là bắt buộc',
   }),
 });
 
@@ -79,12 +80,19 @@ const phoneNumberSchema = Joi.string()
     'any.required': 'Số điện thoại là bắt buộc',
   });
 
+const genderSchema = Joi.string().valid('male', 'female').required().messages({
+  'any.only': 'Giới tính chỉ được chọn giữa "male" hoặc "female"',
+  'string.empty': 'Giới tính không được để trống',
+  'any.required': 'Giới tính là bắt buộc',
+});
+
 export const registerSchema = Joi.object({
   fullName: fullNameSchema,
   email: emailSchema,
   password: passwordSchema,
   passwordConfirm: confirmPasswordSchema,
   phoneNumber: phoneNumberSchema,
+  gender: genderSchema,
 });
 
 export const loginSchema = Joi.object({
@@ -102,6 +110,7 @@ export const resetPasswordSchema = Joi.object({
 export const updateMeSchema = Joi.object({
   fullName: fullNameSchema,
   phoneNumber: phoneNumberSchema,
+  gender: genderSchema,
 });
 
 export const addAddressSchema = Joi.object({
@@ -109,4 +118,10 @@ export const addAddressSchema = Joi.object({
   phoneNumberReceiver: phoneNumberSchema,
   addressReceiver: addressReceiverSchema.required().label('Address Receiver'),
   detailAddressReceiver: detailAddressSchema,
+});
+
+export const checkAddressOrderSchema = Joi.object({
+  receiver: nameSchema,
+  phoneNumber: phoneNumberSchema,
+  address: addressSchema,
 });

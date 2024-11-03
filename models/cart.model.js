@@ -1,38 +1,47 @@
 import mongoose from 'mongoose';
 
-const cartSchema = new mongoose.Schema(
+// Schema cho kích thước sản phẩm
+const sizeSchema = new mongoose.Schema({
+  nameSize: { type: String, required: true },
+  price: { type: Number, required: true },
+  inventory: { type: Number, required: true, min: 0 },
+});
+
+// Schema cho biến thể sản phẩm
+const variantSchema = new mongoose.Schema({
+  color: { type: String, required: true },
+  images: [String],
+  sizes: [sizeSchema],
+});
+
+// Schema cho sản phẩm trong giỏ hàng
+// Schema cho sản phẩm trong giỏ hàng
+const cartItemSchema = new mongoose.Schema(
   {
-    userId: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'User', // Tham chiếu tới bảng người dùng
-      required: true,
-    },
     productId: {
       type: mongoose.Schema.ObjectId,
-      ref: 'Product', // Tham chiếu tới bảng sản phẩm
+      ref: 'Product',
       required: true,
     },
-    variantId: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'Product.variants', // Tham chiếu tới biến thể của sản phẩm
-      required: true,
-    },
-    sizeId: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'Product.variants.sizes', // Tham chiếu tới size của sản phẩm
-      required: true,
-    },
-    quantity: {
-      type: Number,
-      default: 1,
-      min: 1,
-    },
+    colorId: { type: String, required: true }, // id của màu sắc
+    sizeId: { type: String, required: true }, // id của kích thước
+    quantity: { type: Number, required: true, min: 1 }, // Số lượng
+  },
+  { _id: false }
+);
+
+// Schema giỏ hàng
+const cartSchema = new mongoose.Schema(
+  {
+    userId: { type: mongoose.Schema.ObjectId, ref: 'User', required: true },
+    items: [cartItemSchema], // Danh sách sản phẩm trong giỏ hàng
+    total: { type: Number, default: 0 }, // Tổng tiền
   },
   {
-    versionKey: false,
-    timestamps: true,
+    timestamps: true, // Tạo trường createdAt và updatedAt
   }
 );
 
+// Tạo model cho giỏ hàng
 const Cart = mongoose.model('Cart', cartSchema);
 export default Cart;

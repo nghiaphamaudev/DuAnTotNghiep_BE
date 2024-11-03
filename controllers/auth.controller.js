@@ -44,7 +44,7 @@ const createSendRes = (user, statusCode, res) => {
 //Register
 export const register = catchAsync(async (req, res, next) => {
   //Lấy dữ liệu từ form
-  const { email, fullName, password, phoneNumber } = req.body;
+  const { email, fullName, password, phoneNumber, gender } = req.body;
   //Validate từ form
   const { error } = registerSchema.validate(req.body, { abortEarly: false });
   // Hiển thị lỗi
@@ -68,7 +68,7 @@ export const register = catchAsync(async (req, res, next) => {
       )
     );
   }
-  await User.create({ email, fullName, password, phoneNumber });
+  await User.create({ email, fullName, password, phoneNumber, gender });
   res.status(StatusCodes.OK).json({
     ok: true,
     message: 'Thành công',

@@ -39,10 +39,10 @@ const filterObj = (obj, ...allowedFiels) => {
 export const updateMe = catchAsync(async (req, res, next) => {
   // req.file.path = https://res.cloudinary.com/dyv5zfnit/image/upload/v1728037423/users/5270ef936a2391329b3f3c0ee37b8f1190b06aae01d203640072aa1285540132.jpg
 
-  const { phoneNumber, fullName } = req.body;
+  const { phoneNumber, fullName, gender } = req.body;
   //Validate từ form
   const { error } = updateMeSchema.validate(
-    { phoneNumber, fullName },
+    { phoneNumber, fullName, gender },
     { abortEarly: false }
   );
   if (error) {
@@ -57,7 +57,13 @@ export const updateMe = catchAsync(async (req, res, next) => {
       )
     );
   }
-  const filtedBody = filterObj(req.body, 'phoneNumber', 'fullName', 'avatar');
+  const filtedBody = filterObj(
+    req.body,
+    'phoneNumber',
+    'fullName',
+    'avatar',
+    'gender'
+  );
   const userCurrent = await User.findById(req.user.id);
   if (!userCurrent) {
     return next(
@@ -156,12 +162,15 @@ export const addAddress = catchAsync(async (req, res, next) => {
 export const updateAddress = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
   const idAddress = req.params.addressId;
+  console.log(idAddress);
   const {
     nameReceiver,
     phoneNumberReceiver,
     addressReceiver,
     detailAddressReceiver,
   } = req.body;
+
+  console.log(req.body);
 
   // Validate dữ liệu từ request body
   const { error } = addAddressSchema.validate(
@@ -350,13 +359,84 @@ export const getAllUser = catchAsync(async (req, res, next) => {
   });
 });
 
+import axios from 'axios';
+
 export const getUserById = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.params.userId);
   if (!user)
     return next(new AppError('User không tồn tại!', StatusCodes.NOT_FOUND));
+
+  // Tách thông tin chung của người dùng
+  const userInfo = {
+    _id: user._id,
+    email: user.email,
+    fullName: user.fullName,
+    phoneNumber: user.phoneNumber,
+    avatar: user.avatar,
+    role: user.role,
+    rank: user.rank,
+    gender: user.gender,
+    active: user.active,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+
+  // Lấy danh sách địa chỉ và gọi API để lấy thông tin chi tiết
+  const addresses = await Promise.all(
+    user.addresses.map(async (address) => {
+      try {
+        const [provinceResponse, districtResponse, wardResponse] =
+          await Promise.all([
+            axios.get(
+              `https://provinces.open-api.vn/api/p/${address.addressReceiver.province.code}`
+            ),
+            axios.get(
+              `https://provinces.open-api.vn/api/d/${address.addressReceiver.district.code}`
+            ),
+            axios.get(
+              `https://provinces.open-api.vn/api/w/${address.addressReceiver.ward.code}`
+            ),
+          ]);
+
+        return {
+          nameReceiver: address.nameReceiver,
+          phoneNumberReceiver: address.phoneNumberReceiver,
+          detailAddressReceiver: address.detailAddressReceiver,
+          isDefault: address.isDefault,
+          addressReceiver: {
+            province: {
+              provinceCode: address.addressReceiver.province.code,
+              provinceName: provinceResponse.data.name,
+            },
+            district: {
+              districtCode: address.addressReceiver.district.code,
+              districtName: districtResponse.data.name,
+            },
+            ward: {
+              wardCode: address.addressReceiver.ward.code,
+              wardName: wardResponse.data.name,
+            },
+          },
+          _id: address._id,
+          id: address.id,
+        };
+      } catch (error) {
+        return next(
+          new AppError(
+            'Lỗi khi gọi API địa chỉ',
+            StatusCodes.INTERNAL_SERVER_ERROR
+          )
+        );
+      }
+    })
+  );
+
   res.status(StatusCodes.OK).json({
     status: 'success',
-    data: user,
+    data: {
+      userInfo,
+      addresses,
+    },
   });
 });
 
