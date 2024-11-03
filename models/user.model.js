@@ -15,6 +15,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    gender: {
+      type: String,
+      enum: ['male', 'female'],
+      required: true,
+    },
     avatar: {
       type: String,
       default:
@@ -37,15 +42,12 @@ const userSchema = new mongoose.Schema(
         addressReceiver: {
           province: {
             code: { type: String, required: true },
-            name: { type: String, required: true },
           },
           district: {
             code: { type: String, required: true },
-            name: { type: String, required: true },
           },
           ward: {
             code: { type: String, required: true },
-            name: { type: String, required: true },
           },
         },
         detailAddressReceiver: String,
