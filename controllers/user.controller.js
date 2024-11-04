@@ -170,8 +170,6 @@ export const updateAddress = catchAsync(async (req, res, next) => {
     detailAddressReceiver,
   } = req.body;
 
-  console.log(req.body);
-
   // Validate dữ liệu từ request body
   const { error } = addAddressSchema.validate(
     {
@@ -367,19 +365,6 @@ export const getUserById = catchAsync(async (req, res, next) => {
     return next(new AppError('User không tồn tại!', StatusCodes.NOT_FOUND));
 
   // Tách thông tin chung của người dùng
-  const userInfo = {
-    _id: user._id,
-    email: user.email,
-    fullName: user.fullName,
-    phoneNumber: user.phoneNumber,
-    avatar: user.avatar,
-    role: user.role,
-    rank: user.rank,
-    gender: user.gender,
-    active: user.active,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  };
 
   // Lấy danh sách địa chỉ và gọi API để lấy thông tin chi tiết
   const addresses = await Promise.all(
@@ -434,7 +419,17 @@ export const getUserById = catchAsync(async (req, res, next) => {
   res.status(StatusCodes.OK).json({
     status: 'success',
     data: {
-      userInfo,
+      _id: user._id,
+      email: user.email,
+      fullName: user.fullName,
+      phoneNumber: user.phoneNumber,
+      avatar: user.avatar,
+      role: user.role,
+      rank: user.rank,
+      gender: user.gender,
+      active: user.active,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
       addresses,
     },
   });
