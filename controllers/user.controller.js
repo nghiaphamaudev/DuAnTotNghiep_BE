@@ -162,7 +162,7 @@ export const addAddress = catchAsync(async (req, res, next) => {
 export const updateAddress = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
   const idAddress = req.params.addressId;
-  console.log(idAddress);
+
   const {
     nameReceiver,
     phoneNumberReceiver,

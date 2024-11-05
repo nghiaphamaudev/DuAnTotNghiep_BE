@@ -2,21 +2,24 @@ import { Router } from 'express';
 import { protect } from '../controllers/auth.controller';
 import {
   addItemToCart,
-  decreaseProductQuantity,
-  increaseProductQuantity,
+  // increaseProductQuantity,
   removeCartItem,
   getCartDetails,
   updateProductQuantity,
+  changeQuantityCart,
+  getCartByUser,
 } from '../controllers/cart.controller';
 
 const cartRouter = Router();
 
-cartRouter.post('/add', addItemToCart);
-cartRouter.get('/get-cart-detail', protect, getCartDetails);
-cartRouter.delete('/', removeCartItem);
-cartRouter.patch('/', updateProductQuantity);
-cartRouter.post('/increase', increaseProductQuantity);
-cartRouter.post('/decrease', decreaseProductQuantity);
+cartRouter.use(protect);
 
+cartRouter.post('/add', addItemToCart);
+cartRouter.get('/get-cart-detail', getCartDetails);
+cartRouter.delete('/', getCartByUser, removeCartItem);
+cartRouter.get('/', getCartByUser);
+cartRouter.patch('/', updateProductQuantity);
+cartRouter.patch('/change-quantity-cart', getCartByUser, changeQuantityCart);
+// cartRouter.patch('/decrease', decreaseProductQuantity);
 
 export default cartRouter;

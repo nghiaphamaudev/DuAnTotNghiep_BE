@@ -1,34 +1,15 @@
 import mongoose from 'mongoose';
 
-// Schema cho kích thước sản phẩm
-const sizeSchema = new mongoose.Schema({
-  nameSize: { type: String, required: true },
-  price: { type: Number, required: true },
-  inventory: { type: Number, required: true, min: 0 },
-});
-
-// Schema cho biến thể sản phẩm
-const variantSchema = new mongoose.Schema({
-  color: { type: String, required: true },
-  images: [String],
-  sizes: [sizeSchema],
-});
-
-// Schema cho sản phẩm trong giỏ hàng
-// Schema cho sản phẩm trong giỏ hàng
-const cartItemSchema = new mongoose.Schema(
-  {
-    productId: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'Product',
-      required: true,
-    },
-    colorId: { type: String, required: true }, // id của màu sắc
-    sizeId: { type: String, required: true }, // id của kích thước
-    quantity: { type: Number, required: true, min: 1 }, // Số lượng
+const cartItemSchema = new mongoose.Schema({
+  productId: {
+    type: mongoose.Schema.ObjectId,
+    ref: 'Product',
+    required: true,
   },
-  { _id: false }
-);
+  colorId: { type: String, required: true },
+  sizeId: { type: String, required: true },
+  quantity: { type: Number, required: true, min: 1 },
+});
 
 // Schema giỏ hàng
 const cartSchema = new mongoose.Schema(
@@ -38,7 +19,10 @@ const cartSchema = new mongoose.Schema(
     total: { type: Number, default: 0 }, // Tổng tiền
   },
   {
-    timestamps: true, // Tạo trường createdAt và updatedAt
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+    versionKey: false,
+    timestamps: true,
   }
 );
 
