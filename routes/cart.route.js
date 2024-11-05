@@ -2,11 +2,11 @@ import { Router } from 'express';
 import { protect } from '../controllers/auth.controller';
 import {
   addItemToCart,
-  decreaseProductQuantity,
-  increaseProductQuantity,
+  // increaseProductQuantity,
   removeCartItem,
   getCartDetails,
   updateProductQuantity,
+  changeQuantityCart,
   getCartByUser,
 } from '../controllers/cart.controller';
 
@@ -16,10 +16,10 @@ cartRouter.use(protect);
 
 cartRouter.post('/add', addItemToCart);
 cartRouter.get('/get-cart-detail', getCartDetails);
-cartRouter.delete('/', removeCartItem);
+cartRouter.delete('/', getCartByUser, removeCartItem);
 cartRouter.get('/', getCartByUser);
 cartRouter.patch('/', updateProductQuantity);
-cartRouter.patch('/increase', getCartByUser, increaseProductQuantity);
-cartRouter.patch('/decrease', decreaseProductQuantity);
+cartRouter.patch('/change-quantity-cart', getCartByUser, changeQuantityCart);
+// cartRouter.patch('/decrease', decreaseProductQuantity);
 
 export default cartRouter;
