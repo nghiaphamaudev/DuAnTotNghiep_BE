@@ -80,8 +80,8 @@ const phoneNumberSchema = Joi.string()
     'any.required': 'Số điện thoại là bắt buộc',
   });
 
-const genderSchema = Joi.string().valid('male', 'female').required().messages({
-  'any.only': 'Giới tính chỉ được chọn giữa "male" hoặc "female"',
+const genderSchema = Joi.string().valid('Nam', 'Nữ').required().messages({
+  'any.only': 'Giới tính chỉ được chọn giữa "Nam" hoặc "Nữ" hoặc "Khác"',
   'string.empty': 'Giới tính không được để trống',
   'any.required': 'Giới tính là bắt buộc',
 });
@@ -92,7 +92,6 @@ export const registerSchema = Joi.object({
   password: passwordSchema,
   passwordConfirm: confirmPasswordSchema,
   phoneNumber: phoneNumberSchema,
-  gender: genderSchema,
 });
 
 export const loginSchema = Joi.object({

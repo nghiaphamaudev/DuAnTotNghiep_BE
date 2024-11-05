@@ -44,7 +44,7 @@ const createSendRes = (user, statusCode, res) => {
 //Register
 export const register = catchAsync(async (req, res, next) => {
   //Lấy dữ liệu từ form
-  const { email, fullName, password, phoneNumber, gender } = req.body;
+  const { email, fullName, password, phoneNumber } = req.body;
   //Validate từ form
   const { error } = registerSchema.validate(req.body, { abortEarly: false });
   // Hiển thị lỗi
@@ -68,7 +68,7 @@ export const register = catchAsync(async (req, res, next) => {
       )
     );
   }
-  await User.create({ email, fullName, password, phoneNumber, gender });
+  await User.create({ email, fullName, password, phoneNumber });
   res.status(StatusCodes.OK).json({
     ok: true,
     message: 'Thành công',
@@ -168,6 +168,7 @@ export const restrictTo = (...roles) => {
 export const forgotPassword = catchAsync(async (req, res, next) => {
   //1) Get User based on posted email
   const { email } = req.body;
+
   //Validate từ form
   const { error } = forgotPasswordSchema.validate(
     { email },

@@ -7,16 +7,19 @@ import {
   removeCartItem,
   getCartDetails,
   updateProductQuantity,
+  getCartByUser,
 } from '../controllers/cart.controller';
 
 const cartRouter = Router();
 
-cartRouter.post('/add', addItemToCart);
-cartRouter.get('/get-cart-detail', protect, getCartDetails);
-cartRouter.delete('/', removeCartItem);
-cartRouter.patch('/', updateProductQuantity);
-cartRouter.post('/increase', increaseProductQuantity);
-cartRouter.post('/decrease', decreaseProductQuantity);
+cartRouter.use(protect);
 
+cartRouter.post('/add', addItemToCart);
+cartRouter.get('/get-cart-detail', getCartDetails);
+cartRouter.delete('/', removeCartItem);
+cartRouter.get('/', getCartByUser);
+cartRouter.patch('/', updateProductQuantity);
+cartRouter.patch('/increase', getCartByUser, increaseProductQuantity);
+cartRouter.patch('/decrease', decreaseProductQuantity);
 
 export default cartRouter;

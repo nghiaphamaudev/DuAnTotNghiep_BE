@@ -88,9 +88,16 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
   });
 });
 
+export const getCartByUser = catchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+  const currentCartUser = await Cart.findOne({ userId });
+  console.log(currentCartUser);
+  req.currentCart = currentCartUser;
+  next();
+});
+
 export const getCartDetails = catchAsync(async (req, res, next) => {
-  const userId = req.user.id; // lấy userId từ request hoặc từ token
-  console.log(userId);
+  const userId = req.user.id;
   const cart = await Cart.findOne({ userId }).populate({
     path: 'items.productId',
     select: 'name coverImg variants',
@@ -102,14 +109,14 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
     cart.items.map(async (item) => {
       const product = item.productId;
       const variant = product.variants.find(
-        (v) => v._id.toString() === item.colorId // Nên sử dụng item.variantId
+        (v) => v._id.toString() === item.colorId
       );
       const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
 
       return {
+        _id: item._id,
         productId: product._id,
         name: product.name,
-
         color: variant.color,
         images: variant.images[0],
         size: size.nameSize,
@@ -122,10 +129,10 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
     })
   );
 
-  res.status(200).json({
+  res.status(StatusCodes.OK).json({
     status: 'success',
     data: {
-      userId: cart.userId,
+      user: cart.userId,
       items: cartDetails,
       total: cart.total,
     },
@@ -185,35 +192,8 @@ export const updateProductQuantity = catchAsync(async (req, res, next) => {
 });
 
 export const increaseProductQuantity = catchAsync(async (req, res, next) => {
-  const { userId, cartItemId } = req.body;
-
-  const cartItem = await Cart.findById(cartItemId);
-
-  if (!cartItem || cartItem.userId.toString() !== userId) {
-    return next(
-      new AppError('Cart item not found or user not authorized', 404)
-    );
-  }
-
-  // Tăng số lượng sản phẩm
-  cartItem.quantity++;
-
-  // Lưu giỏ hàng đã cập nhật
-  await cartItem.save();
-
-  // Trả về mục giỏ hàng đã cập nhật
-  res.status(StatusCodes.OK).json({
-    status: 'success',
-    cartItem: {
-      _id: cartItem._id,
-      productId: cartItem.productId,
-      variantId: cartItem.variantId,
-      sizeId: cartItem.sizeId,
-      quantity: cartItem.quantity,
-      createdAt: cartItem.createdAt,
-      updatedAt: cartItem.updatedAt,
-    },
-  });
+  const cart = req.currentCart;
+  return res.status(StatusCodes.OK).json({ data: cart });
 });
 
 export const decreaseProductQuantity = catchAsync(async (req, res, next) => {
