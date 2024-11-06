@@ -27,12 +27,23 @@ const cartItemSchema = new mongoose.Schema(
   }
 );
 
+// Trường ảo tính tổng tiền cho mỗi sản phẩm trong giỏ hàng
+cartItemSchema.virtual('totalItemPrice').get(function () {
+  if (this.productId && this.productId.price) {
+    return this.quantity * this.productId.price;
+  }
+  return 0;
+});
+
+cartItemSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
+
 // Schema giỏ hàng
 const cartSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.ObjectId, ref: 'User', required: true },
     items: [cartItemSchema], // Danh sách sản phẩm trong giỏ hàng
-    total: { type: Number, default: 0 }, // Tổng tiền
   },
   {
     toObject: { virtuals: true },
@@ -41,9 +52,12 @@ const cartSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-cartItemSchema.virtual('id').get(function () {
-  return this._id.toHexString();
+
+// Trường ảo tính tổng tiền của giỏ hàng
+cartSchema.virtual('total').get(function () {
+  return this.items.reduce((acc, item) => acc + item.totalItemPrice, 0);
 });
+
 // Tạo model cho giỏ hàng
 const Cart = mongoose.model('Cart', cartSchema);
 export default Cart;

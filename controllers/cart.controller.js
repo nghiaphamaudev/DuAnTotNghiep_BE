@@ -128,12 +128,18 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
     })
   );
 
+  // Tính tổng giá tiền của giỏ hàng
+  const totalCartPrice = cartDetails.reduce(
+    (acc, item) => acc + item.totalItemPrice,
+    0
+  );
+
   res.status(StatusCodes.OK).json({
     status: 'success',
     data: {
       user: cart.userId,
       items: cartDetails,
-      total: cart.total,
+      totalCartPrice, // Trả tổng giá tiền của giỏ hàng
     },
   });
 });
