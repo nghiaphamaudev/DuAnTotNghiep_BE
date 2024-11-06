@@ -21,7 +21,7 @@ const sizeSchema = new mongoose.Schema(
         delete ret._id;
       },
     },
-  } // Tắt _id trong sizeSchema
+  }
 );
 
 const variantSchema = new mongoose.Schema(
@@ -43,7 +43,7 @@ const variantSchema = new mongoose.Schema(
         delete ret._id;
       },
     },
-  } // Tắt _id trong variantSchema
+  }
 );
 
 const productSchema = new mongoose.Schema(
@@ -79,7 +79,6 @@ const productSchema = new mongoose.Schema(
   }
 );
 
-// Tạo trường ảo "id" thay cho "_id"
 productSchema.virtual('id').get(function () {
   return this._id.toHexString();
 });
