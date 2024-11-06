@@ -14,7 +14,7 @@ const cartRouter = Router();
 
 cartRouter.use(protect);
 
-cartRouter.post('/add', addItemToCart);
+cartRouter.post('/add', protect, addItemToCart);
 cartRouter.get('/get-cart-detail', getCartDetails);
 cartRouter.delete('/', getCartByUser, removeCartItem);
 cartRouter.get('/', getCartByUser);

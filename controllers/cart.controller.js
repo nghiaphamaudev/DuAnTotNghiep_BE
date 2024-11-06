@@ -6,7 +6,8 @@ import catchAsync from '../utils/catchAsync.util';
 import { StatusCodes } from 'http-status-codes';
 
 export const addItemToCart = catchAsync(async (req, res, next) => {
-  const { userId, productId, variantId, sizeId, quantity } = req.body;
+  const userId = req.user.id;
+  const { productId, variantId, sizeId, quantity } = req.body;
   // Lấy sản phẩm dựa trên productId
   const product = await Product.findById(productId);
   if (!product) {
@@ -112,7 +113,7 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
       const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
 
       return {
-        _id: item._id,
+        id: item._id,
         productId: product._id,
         name: product.name,
         color: variant.color,

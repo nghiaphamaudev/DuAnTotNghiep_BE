@@ -1,15 +1,31 @@
 import mongoose from 'mongoose';
 
-const cartItemSchema = new mongoose.Schema({
-  productId: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'Product',
-    required: true,
+const cartItemSchema = new mongoose.Schema(
+  {
+    productId: {
+      type: mongoose.Schema.ObjectId,
+      ref: 'Product',
+      required: true,
+    },
+    colorId: { type: String, required: true },
+    sizeId: { type: String, required: true },
+    quantity: { type: Number, required: true, min: 1 },
   },
-  colorId: { type: String, required: true },
-  sizeId: { type: String, required: true },
-  quantity: { type: Number, required: true, min: 1 },
-});
+  {
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+  }
+);
 
 // Schema giỏ hàng
 const cartSchema = new mongoose.Schema(
@@ -19,13 +35,15 @@ const cartSchema = new mongoose.Schema(
     total: { type: Number, default: 0 }, // Tổng tiền
   },
   {
-    toJSON: { virtuals: true },
     toObject: { virtuals: true },
+    toJSON: { virtuals: true },
     versionKey: false,
     timestamps: true,
   }
 );
-
+cartItemSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
 // Tạo model cho giỏ hàng
 const Cart = mongoose.model('Cart', cartSchema);
 export default Cart;
