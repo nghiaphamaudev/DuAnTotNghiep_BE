@@ -17,12 +17,25 @@ const categorySeasonSchema = new mongoose.Schema(
     },
   },
   {
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-    versionKey: false,
-    timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+      timestamps: true,
+      versionKey: false,
+    },
   }
 );
+categorySeasonSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
 
 const CategorySeason = mongoose.model('CategorySeason', categorySeasonSchema);
 export default CategorySeason;

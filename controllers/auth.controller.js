@@ -34,7 +34,7 @@ const createSendRes = (user, statusCode, res) => {
   res.cookie('jwt', token, cookieOptions);
   user.password = undefined;
   res.status(statusCode).json({
-    ok: true,
+    status: true,
     data: user,
     accessToken: token,
     message: 'Thành công',
@@ -70,7 +70,7 @@ export const register = catchAsync(async (req, res, next) => {
   }
   await User.create({ email, fullName, password, phoneNumber });
   res.status(StatusCodes.OK).json({
-    ok: true,
+    status: true,
     message: 'Thành công',
   });
 });
@@ -196,7 +196,7 @@ export const forgotPassword = catchAsync(async (req, res, next) => {
     );
 
     res.status(StatusCodes.OK).json({
-      status: 'success',
+      status: true,
       message: 'Token đặt lại mật khẩu đã được gửi đến email của bạn!',
     });
   } catch (error) {
@@ -285,5 +285,5 @@ export const logout = (req, res) => {
     expires: new Date(Date.now() + 10 * 1000),
     httpOnly: true,
   });
-  res.status(StatusCodes.OK).json({ status: 'success' });
+  res.status(StatusCodes.OK).json({ status: 'true' });
 };
