@@ -57,15 +57,12 @@ export const createProduct = catchAsync(async (req, res, next) => {
       images: imagesByVariant[index] || [],
     })),
   };
-
-  // Ghi log dữ liệu sản phẩm trước khi lưu
-  console.log('Product data to be created:', productData);
-
   // Tạo sản phẩm
   const product = await Product.create(productData);
 
   return res.status(StatusCodes.CREATED).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: product,
   });
 });
@@ -201,7 +198,8 @@ export const updateProduct = catchAsync(async (req, res, next) => {
 
   // Phản hồi thành công
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: {
       product: updatedProduct,
     },
@@ -216,7 +214,8 @@ export const relatedProduct = catchAsync(async (req, res, next) => {
   });
 
   return res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: product,
   });
 });
@@ -227,8 +226,8 @@ export const deleteProduct = catchAsync(async (req, res, next) => {
     return next(new AppError('Product not found', StatusCodes.NOT_FOUND));
   }
   return res.status(StatusCodes.OK).json({
-    status: 'success',
-    data: product,
+    status: true,
+    message: 'Thành công',
   });
 });
 
@@ -247,7 +246,8 @@ export const deleteProductStatus = catchAsync(async (req, res, next) => {
   }
 
   return res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: product,
   });
 });

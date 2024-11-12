@@ -18,7 +18,8 @@ export const deleteMe = catchAsync(async (req, res, next) => {
   }
   await User.findByIdAndUpdate(userId, { active: false });
   res.status(StatusCodes.NO_CONTENT).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
   });
 });
 
@@ -98,7 +99,8 @@ export const updateMe = catchAsync(async (req, res, next) => {
   });
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: {
       user: updated,
     },
@@ -154,7 +156,8 @@ export const addAddress = catchAsync(async (req, res, next) => {
   await currentUser.save();
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: currentUser.addresses,
   });
 });
@@ -209,7 +212,8 @@ export const updateAddress = catchAsync(async (req, res, next) => {
   await currentUser.save();
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: currentUser.addresses,
   });
 });
@@ -247,7 +251,8 @@ export const updateStatusAddress = catchAsync(async (req, res, next) => {
   });
 
   return res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: currentUser.addresses,
   });
 });
@@ -296,7 +301,8 @@ export const addFavoriteProduct = catchAsync(async (req, res, next) => {
   );
   if (isExsitedIdFavoriteProduct)
     return res.status(StatusCodes.OK).json({
-      status: 'success',
+      status: true,
+      message: 'Thành công',
     });
 
   const favoriteProduct = await User.findByIdAndUpdate(
@@ -308,7 +314,8 @@ export const addFavoriteProduct = catchAsync(async (req, res, next) => {
   //Add new address
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: favoriteProduct,
   });
 });
@@ -325,7 +332,8 @@ export const removeFavoriteProduct = catchAsync(async (req, res, next) => {
   );
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: updatedUser,
   });
 });
@@ -344,7 +352,8 @@ export const getAllUser = catchAsync(async (req, res, next) => {
   const totalPages = Math.ceil(totalUsers / limit);
 
   res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: {
       users,
       pagination: {
@@ -417,7 +426,8 @@ export const getUserById = catchAsync(async (req, res, next) => {
   );
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: {
       _id: user._id,
       email: user.email,
@@ -449,7 +459,8 @@ export const toggleBlockUserById = catchAsync(async (req, res, next) => {
   await user.toggleBlockUser(shouldBlock);
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     message: shouldBlock
       ? 'Người dùng đã bị chặn thành công'
       : 'Người dùng đã được bỏ chặn thành công',
@@ -472,7 +483,8 @@ export const changeUserRole = catchAsync(async (req, res, next) => {
   await user.save();
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     message: `Vai trò người dùng đã được thay đổi thành công thành ${user.role}`,
     data: user,
   });

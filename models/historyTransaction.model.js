@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-const historyTransaction = new mongoose.Schema(
+const historyTransactionSchema = new mongoose.Schema(
   {
     idUser: {
       type: mongoose.Schema.Types.ObjectId,
@@ -33,15 +33,27 @@ const historyTransaction = new mongoose.Schema(
     },
   },
   {
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-    versionKey: false,
-    timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+      timestamps: true,
+      versionKey: false,
+    },
   }
 );
-
+historyTransactionSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
 const HistoryTransaction = mongoose.model(
   'HistoryTransaction',
-  historyTransaction
+  historyTransactionSchema
 );
 export default HistoryTransaction;

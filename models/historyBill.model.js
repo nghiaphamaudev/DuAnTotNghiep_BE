@@ -34,9 +34,24 @@ const historyBillSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
-    versionKey: false,
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+      timestamps: true,
+      versionKey: false,
+    },
   }
 );
+historyBillSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
 const HistoryBill = mongoose.model('HistoryBill', historyBillSchema);
 export default HistoryBill;

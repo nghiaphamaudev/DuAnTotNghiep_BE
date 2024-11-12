@@ -80,12 +80,25 @@ const userSchema = new mongoose.Schema(
     },
   },
   {
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-    versionKey: false,
-    timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+      timestamps: true,
+      versionKey: false,
+    },
   }
 );
+userSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
 
 //Mã hóa password trước khi lưu vào db
 userSchema.pre('save', async function (next) {
