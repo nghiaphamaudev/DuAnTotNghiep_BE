@@ -399,16 +399,16 @@ export const getUserById = catchAsync(async (req, res, next) => {
           isDefault: address.isDefault,
           addressReceiver: {
             province: {
-              provinceCode: address.addressReceiver.province.code,
-              provinceName: provinceResponse.data.name,
+              code: address.addressReceiver.province.code,
+              name: provinceResponse.data.name,
             },
             district: {
-              districtCode: address.addressReceiver.district.code,
-              districtName: districtResponse.data.name,
+              code: address.addressReceiver.district.code,
+              name: districtResponse.data.name,
             },
             ward: {
-              wardCode: address.addressReceiver.ward.code,
-              wardName: wardResponse.data.name,
+              code: address.addressReceiver.ward.code,
+              name: wardResponse.data.name,
             },
           },
           _id: address._id,
