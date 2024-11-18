@@ -121,7 +121,10 @@ export const protect = catchAsync(async (req, res, next) => {
   }
   if (!token) {
     return next(
-      new AppError('Bạn chưa đăng nhập, vui lòng đăng nhập để tiếp tục')
+      new AppError(
+        'Bạn chưa đăng nhập, vui lòng đăng nhập để tiếp tục',
+        StatusCodes.UNAUTHORIZED
+      )
     );
   }
   // Kiểm tra trong trường hợp người dùng này đã bị xóa  nhưng vẫn có token để đăng nhập

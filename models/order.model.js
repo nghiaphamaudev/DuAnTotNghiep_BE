@@ -82,9 +82,16 @@ const orderSchema = new mongoose.Schema(
         'Đã giao hàng',
         'Đã nhận được hàng',
         'Hoàn đơn',
+        'Đã bị hủy',
       ],
       default: 'Chờ xác nhận',
     },
+    statusPayment: {
+      type: String,
+      enum: ['Chưa thanh toán', 'Đã thanh toán'],
+      default: 'Chưa thanh toán', // Khi đơn hàng mới được tạo
+    },
+
     discountVoucher: {
       type: Number,
       required: true,

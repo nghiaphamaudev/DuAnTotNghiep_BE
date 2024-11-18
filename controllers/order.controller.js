@@ -2,11 +2,13 @@ import Product from '../models/product.model';
 import Cart from '../models/cart.model';
 import Order from '../models/order.model';
 import dayjs from 'dayjs';
+import axios from 'axios';
 import { StatusCodes } from 'http-status-codes';
 import catchAsync from '../utils/catchAsync.util';
 import AppError from '../utils/appError.util';
 import { checkAddressOrderSchema } from '../validator/user.validator';
 import { uploadProductImages } from '../middlewares/uploadCloud.middleware';
+import { createPaymentUrl } from '../services/payment.service';
 
 function calculateTotalPrice(items) {
   return items.reduce((total, item) => {
@@ -35,10 +37,8 @@ const updateCartAfterOrder = async (userId, orderItems) => {
     console.error('Lỗi khi cập nhật giỏ hàng:', error);
   }
 };
-
 export const createOrder = catchAsync(async (req, res, next) => {
   const userId = req.user.id; // Lấy ID người dùng từ token
-  const cart = req.currentCart;
 
   const { orderItems, ...bodyData } = req.body; // Tách sản phẩm đã chọn và dữ liệu còn lại
   const {
@@ -60,6 +60,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
     const messages = error.details.map((item) => item.message);
     return res.status(StatusCodes.BAD_REQUEST).json({ messages });
   }
+
   const code = `FS${dayjs().format('YYYYMMDDHHmmss')}`;
   const totalPrice = calculateTotalPrice(orderItems);
 
@@ -76,13 +77,28 @@ export const createOrder = catchAsync(async (req, res, next) => {
     shippingCost,
     discountVoucher,
   });
+
   await order.save();
   updateCartAfterOrder(userId, orderItems);
-  if (paymentMethod === "VNPAY") {
 
-  }
+  if (paymentMethod === 'VNPAY') {
+    const urlPayment = createPaymentUrl(
+      req,
+      totalPrice,
+      code,
+      `Thanh toán đơn hàng ${code}`
+    );
     return res.status(200).json({
-      message: 'Thành công',
-      data: order,
+      status: true,
+      message: 'Đơn hàng được tạo thành công, chuyển hướng thanh toán',
+      data: {
+        paymentUrl: urlPayment,
+      },
     });
+  }
+
+  return res.status(200).json({
+    message: 'Thành công',
+    data: order,
+  });
 });

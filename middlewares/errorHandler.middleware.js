@@ -46,8 +46,9 @@ const sendErrorProd = (err, req, res) => {
   }
   if (err.isOperational) {
     res.status(err.statusCode).json({
-      status: err.status,
+      status: false,
       message: err.message,
+      data: null,
     });
   } else {
     res.status(500).json({
