@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 // Dùng để lưu trạng thái khi admin thao tác như xác nhận đơn hàng, vận chuyển ....
 const historyBillSchema = new mongoose.Schema(
   {
-    idUser: {
+    userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       // required: true,
