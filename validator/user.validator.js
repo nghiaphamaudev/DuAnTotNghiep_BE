@@ -18,6 +18,8 @@ const addressSchema = Joi.string().required().messages({
   'any.required': 'Địa chỉ là bắt buộc',
 });
 
+const isDefault = Joi.boolean().optional();
+
 // Định nghĩa schema cho từng phần của địa chỉ
 const addressPartSchema = Joi.object({
   code: Joi.string().required().messages({
@@ -120,6 +122,7 @@ export const addAddressSchema = Joi.object({
   phoneNumberReceiver: phoneNumberSchema,
   addressReceiver: addressReceiverSchema.required().label('Address Receiver'),
   detailAddressReceiver: detailAddressSchema,
+  isDefault: isDefault,
 });
 
 export const checkAddressOrderSchema = Joi.object({
