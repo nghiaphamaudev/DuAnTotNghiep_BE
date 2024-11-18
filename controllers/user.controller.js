@@ -114,6 +114,7 @@ export const addAddress = catchAsync(async (req, res, next) => {
     phoneNumberReceiver,
     addressReceiver,
     detailAddressReceiver,
+    isDefault,
   } = req.body;
 
   // Validate dữ liệu từ form
@@ -132,8 +133,10 @@ export const addAddress = catchAsync(async (req, res, next) => {
     return res.status(StatusCodes.BAD_REQUEST).json({ messages });
   }
 
-  // Kiểm tra xem địa chỉ mới có phải là địa chỉ mặc định không
-  const isDefault = currentUser.addresses.length === 0;
+  // Nếu `isDefault` là true, đặt các địa chỉ khác thành false
+  if (isDefault) {
+    currentUser.addresses.forEach((address) => (address.isDefault = false));
+  }
 
   // Tạo địa chỉ mới
   const newAddress = {
@@ -141,13 +144,8 @@ export const addAddress = catchAsync(async (req, res, next) => {
     phoneNumberReceiver,
     addressReceiver,
     detailAddressReceiver,
-    isDefault,
+    isDefault: isDefault || currentUser.addresses.length === 0, // Địa chỉ đầu tiên luôn là mặc định
   };
-
-  // Nếu địa chỉ mới là mặc định, bỏ dấu mặc định của các địa chỉ cũ
-  if (isDefault) {
-    currentUser.addresses.forEach((address) => (address.isDefault = false));
-  }
 
   // Thêm địa chỉ mới vào danh sách
   currentUser.addresses.push(newAddress);
@@ -222,18 +220,7 @@ export const updateStatusAddress = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
   const idAddressUpdate = req.params.addressId;
 
-  // Tìm và đặt isDefault thành false cho địa chỉ hiện tại đang là mặc định
-  const currentDefaultAddress = currentUser.addresses.find(
-    (address) => address.isDefault === true
-  );
-
-  //set isDefault cho address ti thay la false mang hien tai se la false
-  //Tat ca dang thao tac vo mang
-  if (currentDefaultAddress) {
-    currentDefaultAddress.isDefault = false;
-  }
-
-  // Tìm địa chỉ được truyền qua param và đặt isDefault thành true
+  // Tìm địa chỉ cần cập nhật
   const addressToUpdate = currentUser.addresses.find(
     (address) => address._id.toString() === idAddressUpdate
   );
@@ -241,14 +228,21 @@ export const updateStatusAddress = catchAsync(async (req, res, next) => {
   if (!addressToUpdate) {
     return next(new AppError('Address not found', 404));
   }
+
+  // Đặt tất cả các địa chỉ isDefault thành false
+  currentUser.addresses.forEach((address) => {
+    address.isDefault = false;
+  });
+
+  // Đặt địa chỉ được chọn thành true
   addressToUpdate.isDefault = true;
 
-  currentUser.addresses.sort((a, b) => b.isDefault - a.isDefault);
-
   // Cập nhật user với danh sách địa chỉ mới
-  await User.findByIdAndUpdate(currentUser._id, {
-    addresses: currentUser.addresses,
-  });
+  await User.findByIdAndUpdate(
+    currentUser._id,
+    { addresses: currentUser.addresses },
+    { new: true } // Trả về dữ liệu mới nhất sau khi cập nhật
+  );
 
   return res.status(StatusCodes.OK).json({
     status: true,
