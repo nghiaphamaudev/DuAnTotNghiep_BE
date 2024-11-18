@@ -161,7 +161,7 @@ export const addAddress = catchAsync(async (req, res, next) => {
 });
 
 export const updateAddress = catchAsync(async (req, res, next) => {
-  const currentUser = req.user;
+  const currentUser = req.user; // Lấy thông tin người dùng
   const idAddress = req.params.addressId;
 
   const {
@@ -169,6 +169,7 @@ export const updateAddress = catchAsync(async (req, res, next) => {
     phoneNumberReceiver,
     addressReceiver,
     detailAddressReceiver,
+    isDefault, // Nhận thêm giá trị isDefault từ body
   } = req.body;
 
   // Validate dữ liệu từ request body
@@ -196,14 +197,24 @@ export const updateAddress = catchAsync(async (req, res, next) => {
     return next(new AppError('Địa chỉ không tồn tại', StatusCodes.NOT_FOUND));
   }
 
-  // Cập nhật địa chỉ
+  // Nếu địa chỉ đang được đặt là mặc định
+  if (isDefault) {
+    // Đặt tất cả các địa chỉ khác về không mặc định
+    currentUser.addresses.forEach((address, index) => {
+      if (index !== addressIndex) {
+        address.isDefault = false;
+      }
+    });
+  }
+
+  // Cập nhật địa chỉ hiện tại
   currentUser.addresses[addressIndex] = {
     _id: currentUser.addresses[addressIndex]._id, // Giữ lại _id
     nameReceiver,
     phoneNumberReceiver,
     addressReceiver,
     detailAddressReceiver,
-    isDefault: currentUser.addresses[addressIndex].isDefault,
+    isDefault: isDefault || false, // Nếu không có isDefault thì giữ nguyên trạng thái
   };
 
   // Lưu thay đổi vào database

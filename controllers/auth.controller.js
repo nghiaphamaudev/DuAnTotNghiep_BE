@@ -254,10 +254,9 @@ export const resetPassword = catchAsync(async (req, res, next) => {
 });
 
 export const updatePassword = catchAsync(async (req, res, next) => {
-  //Validate password và passwordConfirm
   const { password, passwordConfirm, passwordCurrent } = req.body;
   const { error } = resetPasswordSchema.validate(
-    { password, passwordConfirm },
+    { passwordCurrent, passwordConfirm ,password},
     { abortEarly: false }
   );
   if (error) {
@@ -275,10 +274,24 @@ export const updatePassword = catchAsync(async (req, res, next) => {
     return next(
       new AppError('Mật khẩu hiện tại không đúng', StatusCodes.UNAUTHORIZED)
     );
+  //Check password có giống vơi mật khẩu cũ không
+  if (password === passwordCurrent) {
+    return next(
+      new AppError(
+        'Mật khẩu đã từng tồn tại. Vui lòng dùng mật khẩu khác!',
+        StatusCodes.BAD_REQUEST
+      )
+    );
+  }
+
   //Cập nhật new password
   currentUser.password = password;
   await currentUser.save();
-  createSendRes(currentUser, StatusCodes.CREATED, res);
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: "Cập nhật thành công!",
+    data:null
+  })
 });
 
 export const logout = (req, res) => {

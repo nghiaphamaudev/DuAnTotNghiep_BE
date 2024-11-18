@@ -99,7 +99,7 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
   const userId = req.user.id;
   const cart = await Cart.findOne({ userId }).populate({
     path: 'items.productId',
-    select: 'name coverImg variants',
+    select: 'name coverImg variants status', // Đưa thêm trạng thái của sản phẩm vào đây
   });
 
   if (!cart) return next(new AppError('Cart not found', 404));
@@ -124,6 +124,9 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
         totalItemPrice: size.price * item.quantity,
         variantId: variant._id,
         sizeId: size._id,
+        statusProduct: product.status, // Trạng thái sản phẩm
+        statusVariant: variant.status, // Trạng thái hết hàng của biến thể
+        statusSize: size.status, // Trạng thái hết hàng của size
       };
     })
   );
