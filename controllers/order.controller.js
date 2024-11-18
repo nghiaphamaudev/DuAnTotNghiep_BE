@@ -1,6 +1,7 @@
 import Product from '../models/product.model';
 import Cart from '../models/cart.model';
 import Order from '../models/order.model';
+import HistoryBill from '../models/historyBill.model';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import { StatusCodes } from 'http-status-codes';
@@ -80,6 +81,16 @@ export const createOrder = catchAsync(async (req, res, next) => {
 
   await order.save();
   updateCartAfterOrder(userId, orderItems);
+
+  const historyBill = new HistoryBill({
+    userId: userId,
+    idBill: order.id,
+    creator: req.user.fullName,
+    role: req.user.role,
+    statusBill: 'Chờ xác nhận',
+    note: '',
+  });
+  await historyBill.save();
 
   if (paymentMethod === 'VNPAY') {
     const urlPayment = createPaymentUrl(

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import dotenv from 'dotenv';
 import dateFormat from 'dayjs';
 import dayjs from 'dayjs';
+import HistoryBill from '../models/historyBill.model';
 import querystring from 'qs';
 import config from 'config';
 import Order from '../models/order.model';
@@ -86,9 +87,8 @@ export const createPaymentUrl = (req, amount, orderId, orderDescription) => {
 
 export const processVnpayPaymentResponse = async (req, res, next) => {
   var vnp_Params = req.query;
-  console.log(req.query);
   var secureHash = vnp_Params['vnp_SecureHash'];
-
+  connsole.log(vnp_Params['vnp_TxnRef']);
   delete vnp_Params['vnp_SecureHash'];
   delete vnp_Params['vnp_SecureHashType'];
 
@@ -102,7 +102,7 @@ export const processVnpayPaymentResponse = async (req, res, next) => {
   if (secureHash === signed) {
     var orderId = vnp_Params['vnp_TxnRef'];
     var rspCode = vnp_Params['vnp_ResponseCode'];
-    console.log(orderId);
+
     if (rspCode === '00') {
       // Giao dịch thành công
       await Order.findOneAndUpdate(
@@ -125,7 +125,7 @@ export const processVnpayPaymentResponse = async (req, res, next) => {
 
 // Hàm này (/vnpay_return) là một endpoint dùng để xử lý thông báo từ VNPAY sau khi thanh toán đã được thực hiện. Đây là nơi VNPAY gửi thông tin phản hồi về kết quả giao dịch đến hệ thống của bạn, và bạn sẽ cần phải kiểm tra tính hợp lệ của dữ liệu và sau đó thông báo kết quả cho người dùng.
 
-export const paymentRedirect = (req, res, next) => {
+export const paymentRedirect = async (req, res, next) => {
   var vnp_Params = req.query;
 
   var secureHash = vnp_Params['vnp_SecureHash'];
@@ -134,20 +134,31 @@ export const paymentRedirect = (req, res, next) => {
   delete vnp_Params['vnp_SecureHashType'];
 
   vnp_Params = sortObject(vnp_Params);
-
+  console.log(vnp_Params['vnp_TxnRef']);
   var tmnCode = vnp_TmnCode;
   var secretKey = vnp_HashSecret;
 
   var signData = querystring.stringify(vnp_Params, { encode: false });
   var hmac = crypto.createHmac('sha512', secretKey);
   var signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
-  console.log('Sign Data: ', signData);
-  console.log('Secure Hash: ', secureHash);
-  console.log('Signed Hash: ', signed);
+
   if (vnp_Params['vnp_TransactionStatus'] === '00') {
-    console.log('Cập nhật đơn hàng!');
+    await Order.updateOne(
+      { code: vnp_Params['vnp_TxnRef'] },
+      {
+        statusPayment: 'Đã thanh tóan',
+      }
+    );
   } else {
-    console.log('Đơn hàng bị hủy');
+    await Order.updateOne(
+      { code: vnp_Params['vnp_TxnRef'] },
+      { status: 'Đã bị hủy' }
+    );
+    // await HistoryBill.updateOne({
+    //   code: vnp_Params['vnp_TxnRef'],
+    // }, {
+
+    // });
   }
   res.status(StatusCodes.OK).json({
     status: true,
