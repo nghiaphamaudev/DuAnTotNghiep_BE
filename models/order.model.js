@@ -89,9 +89,8 @@ const orderSchema = new mongoose.Schema(
     statusPayment: {
       type: String,
       enum: ['Chưa thanh toán', 'Đã thanh toán'],
-      default: 'Chưa thanh toán', 
+      default: 'Chưa thanh toán',
     },
-
     discountVoucher: {
       type: Number,
       required: true,
@@ -103,6 +102,7 @@ const orderSchema = new mongoose.Schema(
     },
   },
   {
+    timestamps: true, // Đặt timestamps ở đây
     toJSON: {
       virtuals: true,
       transform: (_, ret) => {
@@ -114,11 +114,10 @@ const orderSchema = new mongoose.Schema(
       transform: (_, ret) => {
         delete ret._id;
       },
-      timestamps: true,
-      versionKey: false,
     },
   }
 );
+
 orderSchema.virtual('id').get(function () {
   return this._id.toHexString();
 });

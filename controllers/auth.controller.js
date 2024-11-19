@@ -256,7 +256,7 @@ export const resetPassword = catchAsync(async (req, res, next) => {
 export const updatePassword = catchAsync(async (req, res, next) => {
   const { password, passwordConfirm, passwordCurrent } = req.body;
   const { error } = resetPasswordSchema.validate(
-    { passwordCurrent, passwordConfirm ,password},
+    { passwordCurrent, passwordConfirm, password },
     { abortEarly: false }
   );
   if (error) {
@@ -283,15 +283,19 @@ export const updatePassword = catchAsync(async (req, res, next) => {
       )
     );
   }
+  if (passwordConfirm !== password)
+    return next(
+      new AppError('Mật khẩu phải trùng khớp!', StatusCodes.BAD_REQUEST)
+    );
 
   //Cập nhật new password
   currentUser.password = password;
   await currentUser.save();
   res.status(StatusCodes.OK).json({
     status: true,
-    message: "Cập nhật thành công!",
-    data:null
-  })
+    message: 'Cập nhật thành công!',
+    data: null,
+  });
 });
 
 export const logout = (req, res) => {
