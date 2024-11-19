@@ -107,8 +107,8 @@ export const forgotPasswordSchema = Joi.object({
   email: emailSchema,
 });
 export const resetPasswordSchema = Joi.object({
-  password: passwordSchema,
-  passwordCurrent: Joi.string()
+  passwordCurrent: passwordSchema,
+  password: Joi.string()
     .pattern(/[!@#$%^&*(),.?":{}|<>]/) // Yêu cầu chứa ký tự đặc biệt
     .min(6) // Tối thiểu 6 ký tự
     .required()
@@ -119,7 +119,7 @@ export const resetPasswordSchema = Joi.object({
       'string.min': 'Mật khẩu phải tối thiểu {#limit} ký tự',
     }),
   passwordConfirm: Joi.string()
-    .valid(Joi.ref('passwordCurrent')) // Tham chiếu tới `passwordCurrent`
+    .valid(Joi.ref('password')) // Tham chiếu tới `passwordCurrent`
     .required()
     .messages({
       'any.required': 'Xác nhận mật khẩu là bắt buộc',
