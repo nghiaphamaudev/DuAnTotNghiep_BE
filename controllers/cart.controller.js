@@ -11,18 +11,18 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
   // Lấy sản phẩm dựa trên productId
   const product = await Product.findById(productId);
   if (!product) {
-    return next(new AppError('Product not found', 404));
+    return next(new AppError('Sản phẩm không tồn tại!', 404));
   }
   // Lấy biến thể (variant) của sản phẩm
   const variant = product.variants.id(variantId);
   if (!variant) {
-    return next(new AppError('Variant not found', 404));
+    return next(new AppError('Biến thể không tồn tại', 404));
   }
 
   // Kiểm tra sizeId có tồn tại trong biến thể không
   const size = variant.sizes.id(sizeId);
   if (!size) {
-    return next(new AppError('Size not found', 404));
+    return next(new AppError('Kích thước không tồn tại!', 404));
   }
 
   // Lấy ảnh đầu tiên của biến thể

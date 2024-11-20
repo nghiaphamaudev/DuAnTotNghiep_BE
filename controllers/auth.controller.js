@@ -10,6 +10,7 @@ import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  updatePasswordSchema,
 } from '../validator/user.validator';
 import { sendMailServiceForgotPassword } from '../services/email.service';
 
@@ -255,7 +256,7 @@ export const resetPassword = catchAsync(async (req, res, next) => {
 
 export const updatePassword = catchAsync(async (req, res, next) => {
   const { password, passwordConfirm, passwordCurrent } = req.body;
-  const { error } = resetPasswordSchema.validate(
+  const { error } = updatePasswordSchema.validate(
     { passwordCurrent, passwordConfirm, password },
     { abortEarly: false }
   );
