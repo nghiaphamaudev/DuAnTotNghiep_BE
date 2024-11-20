@@ -1,5 +1,9 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import {
+  templateConfirmOrder1,
+  templateConfirmOrder2,
+} from '../constants/confirmOrder.constants';
 dotenv.config();
 // Tạo transporter
 const transporter = nodemailer.createTransport({
@@ -33,6 +37,36 @@ export const sendMailServiceForgotPassword = async (to, subject, link) => {
 
     const info = await transporter.sendMail(mailOptions);
     console.log(link);
+    console.log('Email đã được gửi:', info.response);
+  } catch (error) {
+    console.error('Lỗi khi gửi email:', error);
+    throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
+  }
+};
+export const sendMailServiceConfirmOrder = async (
+  nameUser,
+  orderId,
+  orderDate,
+  totalPrice,
+  products,
+  to,
+  title
+) => {
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USERNAME, // địa chỉ email người gửi
+      to: to, // địa chỉ email người nhận
+      subject: title, // tiêu đề email // nội dung email
+      html: templateConfirmOrder1(
+        nameUser,
+        orderId,
+        orderDate,
+        totalPrice,
+        products
+      ),
+    };
+
+    const info = await transporter.sendMail(mailOptions);
     console.log('Email đã được gửi:', info.response);
   } catch (error) {
     console.error('Lỗi khi gửi email:', error);
