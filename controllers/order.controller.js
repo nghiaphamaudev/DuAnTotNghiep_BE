@@ -108,6 +108,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
       code,
       `Thanh toán đơn hàng ${code}`
     );
+
     return res.status(200).json({
       status: true,
       message: 'Đơn hàng được tạo thành công, chuyển hướng thanh toán',
