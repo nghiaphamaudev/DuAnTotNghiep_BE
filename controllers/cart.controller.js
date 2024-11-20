@@ -99,7 +99,7 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
   const userId = req.user.id;
   const cart = await Cart.findOne({ userId }).populate({
     path: 'items.productId',
-    select: 'name coverImg variants status', // Đưa thêm trạng thái của sản phẩm vào đây
+    select: 'name coverImg variants ', // Đưa thêm trạng thái của sản phẩm vào đây
   });
 
   if (!cart) return next(new AppError('Cart not found', 404));
