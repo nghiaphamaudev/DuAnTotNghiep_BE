@@ -267,14 +267,14 @@ export const deleteProductStatus = async (req, res, next) => {
     return next(new AppError('Product not found', 404));
   }
 
-  product.status = !product.status;
+  product.isActive = !product.isActive;
   await product.save();
 
   res.status(200).json({
     status: 'success',
     data: {
       id: product._id,
-      status: product.status,
+      isActive: product.isActive,
     },
   });
 };
