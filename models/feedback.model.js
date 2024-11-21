@@ -19,12 +19,24 @@ const feedbackSchema = new mongoose.Schema(
     like: { type: Number, require: false, default: 0 },
   },
   {
-    toObject: { virtuals: true },
-    toJSON: { virtuals: true },
-    versionKey: false,
-    timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+      timestamps: true,
+      versionKey: false,
+    },
   }
 );
-
+feedbackSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
 const Feedback = mongoose.model('Feedback', feedbackSchema);
 export default Feedback;

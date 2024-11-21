@@ -11,18 +11,18 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
   // Lấy sản phẩm dựa trên productId
   const product = await Product.findById(productId);
   if (!product) {
-    return next(new AppError('Product not found', 404));
+    return next(new AppError('Sản phẩm không tồn tại!', 404));
   }
   // Lấy biến thể (variant) của sản phẩm
   const variant = product.variants.id(variantId);
   if (!variant) {
-    return next(new AppError('Variant not found', 404));
+    return next(new AppError('Biến thể không tồn tại', 404));
   }
 
   // Kiểm tra sizeId có tồn tại trong biến thể không
   const size = variant.sizes.id(sizeId);
   if (!size) {
-    return next(new AppError('Size not found', 404));
+    return next(new AppError('Kích thước không tồn tại!', 404));
   }
 
   // Lấy ảnh đầu tiên của biến thể
@@ -36,7 +36,7 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
     const existingItem = cart.items.find(
       (item) =>
         item.productId.toString() === productId &&
-        item.colorId === variantId &&
+        item.variantId === variantId &&
         item.sizeId === sizeId
     );
 
@@ -47,7 +47,7 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
       // Nếu chưa có, thêm sản phẩm vào giỏ hàng
       cart.items.push({
         productId,
-        colorId: variantId,
+        variantId: variantId,
         sizeId,
         quantity: quantity || 1,
       });
@@ -59,7 +59,7 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
       items: [
         {
           productId,
-          colorId: variantId,
+          variantId: variantId,
           sizeId,
           quantity: quantity || 1,
         },
@@ -70,12 +70,13 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
   await cart.save();
 
   res.status(201).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: {
       userId: cart.userId,
       items: cart.items.map((item) => ({
         productId: item.productId,
-        variantId: item.colorId,
+        variantId: item.variantId,
         sizeId: item.sizeId,
         quantity: item.quantity,
         image: variantImage,
@@ -90,7 +91,6 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
 export const getCartByUser = catchAsync(async (req, res, next) => {
   const userId = req.user.id;
   const currentCartUser = await Cart.findOne({ userId });
-
   req.currentCart = currentCartUser;
   next();
 });
@@ -99,7 +99,7 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
   const userId = req.user.id;
   const cart = await Cart.findOne({ userId }).populate({
     path: 'items.productId',
-    select: 'name coverImg variants',
+    select: 'name coverImg variants ', // Đưa thêm trạng thái của sản phẩm vào đây
   });
 
   if (!cart) return next(new AppError('Cart not found', 404));
@@ -108,7 +108,7 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
     cart.items.map(async (item) => {
       const product = item.productId;
       const variant = product.variants.find(
-        (v) => v._id.toString() === item.colorId
+        (v) => v._id.toString() === item.variantId
       );
       const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
 
@@ -124,6 +124,9 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
         totalItemPrice: size.price * item.quantity,
         variantId: variant._id,
         sizeId: size._id,
+        statusProduct: product.status, // Trạng thái sản phẩm
+        statusVariant: variant.status, // Trạng thái hết hàng của biến thể
+        statusSize: size.status, // Trạng thái hết hàng của size
       };
     })
   );
@@ -135,7 +138,8 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
   );
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: {
       user: cart.userId,
       items: cartDetails,
@@ -146,7 +150,7 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
 
 export const removeCartItem = catchAsync(async (req, res, next) => {
   const cart = req.currentCart;
-  const { cartItemId } = req.body;
+  const { cartItemId } = req.params;
 
   const itemIndex = cart.items.findIndex(
     (item) => item._id.toString() === cartItemId
@@ -166,8 +170,8 @@ export const removeCartItem = catchAsync(async (req, res, next) => {
   await cart.save();
 
   return res.status(StatusCodes.OK).json({
-    message: 'Xóa sản phẩm khỏi giỏ hàng thành công',
-    data: cart,
+    status: true,
+    message: 'Thành công',
   });
 });
 
@@ -192,7 +196,8 @@ export const updateProductQuantity = catchAsync(async (req, res, next) => {
 
   // Trả về mục giỏ hàng đã cập nhật
   res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     cartItem: {
       _id: cartItem._id,
       productId: cartItem.productId,
@@ -225,9 +230,9 @@ export const updateProductQuantity = catchAsync(async (req, res, next) => {
 // });
 
 const checkProductAvailability = (product, cartItem) => {
-  // tìm variant theo colorId
+  // tìm variant theo variantId
   const variant = product.variants.find(
-    (variant) => variant._id.toString() === cartItem.colorId
+    (variant) => variant._id.toString() === cartItem.variantId
   );
 
   if (!variant) {
@@ -271,7 +276,7 @@ export const changeQuantityCart = catchAsync(async (req, res, next) => {
     'variants.sizes'
   );
 
-  if (option === '+') {
+  if (option === 'decrease') {
     const isAvailable = checkProductAvailability(product, cartItem);
 
     if (isAvailable === true) {
@@ -284,7 +289,7 @@ export const changeQuantityCart = catchAsync(async (req, res, next) => {
         )
       ); // nếu không hợp lệ, trả về lỗi từ hàm kiểm tra
     }
-  } else if (option === '-') {
+  } else if (option === 'increase') {
     if (cartItem.quantity > 1) {
       cartItem.quantity -= 1;
     } else {
@@ -300,5 +305,9 @@ export const changeQuantityCart = catchAsync(async (req, res, next) => {
 
   await cart.save();
 
-  return res.status(StatusCodes.OK).json({ data: cart });
+  return res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Thành công',
+    data: cart,
+  });
 });

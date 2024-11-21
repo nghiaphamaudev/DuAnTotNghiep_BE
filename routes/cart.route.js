@@ -16,7 +16,7 @@ cartRouter.use(protect);
 
 cartRouter.post('/add', protect, addItemToCart);
 cartRouter.get('/get-cart-detail', getCartDetails);
-cartRouter.delete('/', getCartByUser, removeCartItem);
+cartRouter.delete('/:cartItemId', getCartByUser, removeCartItem);
 cartRouter.get('/', getCartByUser);
 cartRouter.patch('/', updateProductQuantity);
 cartRouter.patch('/change-quantity-cart', getCartByUser, changeQuantityCart);

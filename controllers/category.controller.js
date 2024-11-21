@@ -7,7 +7,8 @@ import Product from '../models/product.model';
 export const getAllCategory = catchAsync(async (req, res, next) => {
   const categories = await Category.find();
   return res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: categories,
   });
 });
@@ -18,7 +19,8 @@ export const getCategory = catchAsync(async (req, res, next) => {
     return next(new AppError('The ID category not existed!', 400));
   }
   return res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: category,
   });
 });
@@ -39,7 +41,8 @@ export const deleteCategory = catchAsync(async (req, res, next) => {
   }
 
   return res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: category,
   });
 });
@@ -66,7 +69,8 @@ export const updateCategory = catchAsync(async (req, res, next) => {
   }
 
   return res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: category,
   });
 });
@@ -74,7 +78,8 @@ export const updateCategory = catchAsync(async (req, res, next) => {
 export const createCategory = catchAsync(async (req, res, next) => {
   const newCategory = await Category.create(req.body);
   res.status(201).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: newCategory,
   });
 });

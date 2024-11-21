@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 // Dùng để lưu trạng thái khi admin thao tác như xác nhận đơn hàng, vận chuyển ....
 const historyBillSchema = new mongoose.Schema(
   {
-    idUser: {
+    userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       // required: true,
@@ -34,9 +34,24 @@ const historyBillSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
-    versionKey: false,
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+      timestamps: true,
+      versionKey: false,
+    },
   }
 );
+historyBillSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
 const HistoryBill = mongoose.model('HistoryBill', historyBillSchema);
 export default HistoryBill;

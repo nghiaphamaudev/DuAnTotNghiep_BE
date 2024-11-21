@@ -1,6 +1,47 @@
 import mongoose from 'mongoose';
 import bcryptjs from 'bcryptjs';
 import crypto from 'crypto';
+
+const addressSchema = new mongoose.Schema(
+  {
+    // Tùy chỉnh id cho địa chỉ
+    nameReceiver: { type: String, required: true },
+    phoneNumberReceiver: { type: String, required: true },
+    addressReceiver: {
+      province: {
+        code: { type: String, required: true },
+      },
+      district: {
+        code: { type: String, required: true },
+      },
+      ward: {
+        code: { type: String, required: true },
+      },
+    },
+    detailAddressReceiver: { type: String, required: true },
+    isDefault: { type: Boolean, default: false },
+  },
+  {
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+      timestamps: true,
+      versionKey: false,
+    },
+  }
+);
+addressSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
+
 const userSchema = new mongoose.Schema(
   {
     email: {
@@ -36,25 +77,7 @@ const userSchema = new mongoose.Schema(
       enum: ['Bronze', 'Silver', 'Gold'],
       default: 'Bronze',
     },
-    addresses: [
-      {
-        nameReceiver: String,
-        phoneNumberReceiver: String,
-        addressReceiver: {
-          province: {
-            code: { type: String, required: true },
-          },
-          district: {
-            code: { type: String, required: true },
-          },
-          ward: {
-            code: { type: String, required: true },
-          },
-        },
-        detailAddressReceiver: String,
-        isDefault: Boolean,
-      },
-    ],
+    addresses: [addressSchema],
     favoriteProduct: [
       {
         product: {
@@ -63,7 +86,7 @@ const userSchema = new mongoose.Schema(
           ref: 'Laptop',
         },
       },
-      { _id: false }, // Tắt _id cho mỗi phần tử trong favoriteProduct
+      { _id: false },
     ],
     password: {
       type: String,
@@ -80,38 +103,47 @@ const userSchema = new mongoose.Schema(
     },
   },
   {
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-    versionKey: false,
-    timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+      timestamps: true,
+      versionKey: false,
+    },
   }
 );
 
-//Mã hóa password trước khi lưu vào db
+userSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
+
+// Mã hóa password trước khi lưu vào db
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
   this.password = await bcryptjs.hash(this.password, 12);
   next();
 });
 
-//kiểm tra password có được tạo mới hay thay đổi không , nếu ko thì ko cần cập nhật passwordchangedAt
-//Nếu password thay đổi => passwordchangeAt = Thời gian hiện tại  -1000ms
-//passwordChangedAt luôn trước thời điểm token JWT được tạo, tránh tình huống xung đột do sự chênh lệch thời gian.
+// Kiểm tra password có được tạo mới hay thay đổi không
 userSchema.pre('save', function (next) {
   if (!this.isModified('password') || this.isNew) return next();
   this.passwordChangedAt = Date.now() - 1000;
   next();
 });
 
-//So sánh password db với password nhập bởi user
+// So sánh password db với password nhập bởi user
 userSchema.methods.checkPassword = async function (password) {
   return await bcryptjs.compare(password, this.password);
 };
 
-//dùng để kiểm tra  người dùng có thay đổi pass sau khi mã jwt được tạo hay không
-//nếu this.passwordChangedAT tồn tại thì => user đã thay đổi password mà chưa đăng nhập lại
-// Nếu changedTimestamps > JWTTimestamp  => người dùng đã thay đổi pass sau khi jwt đc tạo +. người dùng dăng nhập lại
-//Nói cách khác là khi người dùng đăng nhập vào và sau đó thay đổi mật khẩu thì bắt phải đăng nhập lại
+// Dùng để kiểm tra người dùng có thay đổi pass sau khi mã jwt được tạo hay không
 userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
   if (this.passwordChangedAt) {
     const changedTimestamps = parseInt(
@@ -123,9 +155,7 @@ userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
   return false;
 };
 
-//Tạo 1 resetToken để
-//resetToken chưa hash => user
-// reset hashed => db
+// Tạo 1 resetToken để
 userSchema.methods.createPasswordResetToken = function () {
   const resetToken = crypto.randomBytes(32).toString('hex');
   this.passwordResetToken = crypto
@@ -136,6 +166,7 @@ userSchema.methods.createPasswordResetToken = function () {
   this.passwordResetTokenExpires = Date.now() + 10 * 60 * 1000;
   return resetToken;
 };
+
 // Phương thức để chặn hoặc bỏ chặn người dùng
 userSchema.methods.toggleBlockUser = function (shouldBlock) {
   this.active = !shouldBlock;

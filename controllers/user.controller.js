@@ -18,7 +18,8 @@ export const deleteMe = catchAsync(async (req, res, next) => {
   }
   await User.findByIdAndUpdate(userId, { active: false });
   res.status(StatusCodes.NO_CONTENT).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
   });
 });
 
@@ -98,7 +99,8 @@ export const updateMe = catchAsync(async (req, res, next) => {
   });
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: {
       user: updated,
     },
@@ -112,6 +114,7 @@ export const addAddress = catchAsync(async (req, res, next) => {
     phoneNumberReceiver,
     addressReceiver,
     detailAddressReceiver,
+    isDefault,
   } = req.body;
 
   // Validate dữ liệu từ form
@@ -130,8 +133,10 @@ export const addAddress = catchAsync(async (req, res, next) => {
     return res.status(StatusCodes.BAD_REQUEST).json({ messages });
   }
 
-  // Kiểm tra xem địa chỉ mới có phải là địa chỉ mặc định không
-  const isDefault = currentUser.addresses.length === 0;
+  // Nếu `isDefault` là true, đặt các địa chỉ khác thành false
+  if (isDefault) {
+    currentUser.addresses.forEach((address) => (address.isDefault = false));
+  }
 
   // Tạo địa chỉ mới
   const newAddress = {
@@ -139,13 +144,8 @@ export const addAddress = catchAsync(async (req, res, next) => {
     phoneNumberReceiver,
     addressReceiver,
     detailAddressReceiver,
-    isDefault,
+    isDefault: isDefault || currentUser.addresses.length === 0, // Địa chỉ đầu tiên luôn là mặc định
   };
-
-  // Nếu địa chỉ mới là mặc định, bỏ dấu mặc định của các địa chỉ cũ
-  if (isDefault) {
-    currentUser.addresses.forEach((address) => (address.isDefault = false));
-  }
 
   // Thêm địa chỉ mới vào danh sách
   currentUser.addresses.push(newAddress);
@@ -154,13 +154,14 @@ export const addAddress = catchAsync(async (req, res, next) => {
   await currentUser.save();
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: currentUser.addresses,
   });
 });
 
 export const updateAddress = catchAsync(async (req, res, next) => {
-  const currentUser = req.user;
+  const currentUser = req.user; // Lấy thông tin người dùng
   const idAddress = req.params.addressId;
 
   const {
@@ -168,6 +169,7 @@ export const updateAddress = catchAsync(async (req, res, next) => {
     phoneNumberReceiver,
     addressReceiver,
     detailAddressReceiver,
+    isDefault, // Nhận thêm giá trị isDefault từ body
   } = req.body;
 
   // Validate dữ liệu từ request body
@@ -195,21 +197,32 @@ export const updateAddress = catchAsync(async (req, res, next) => {
     return next(new AppError('Địa chỉ không tồn tại', StatusCodes.NOT_FOUND));
   }
 
-  // Cập nhật địa chỉ
+  // Nếu địa chỉ đang được đặt là mặc định
+  if (isDefault) {
+    // Đặt tất cả các địa chỉ khác về không mặc định
+    currentUser.addresses.forEach((address, index) => {
+      if (index !== addressIndex) {
+        address.isDefault = false;
+      }
+    });
+  }
+
+  // Cập nhật địa chỉ hiện tại
   currentUser.addresses[addressIndex] = {
     _id: currentUser.addresses[addressIndex]._id, // Giữ lại _id
     nameReceiver,
     phoneNumberReceiver,
     addressReceiver,
     detailAddressReceiver,
-    isDefault: currentUser.addresses[addressIndex].isDefault,
+    isDefault: isDefault || false, // Nếu không có isDefault thì giữ nguyên trạng thái
   };
 
   // Lưu thay đổi vào database
   await currentUser.save();
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: currentUser.addresses,
   });
 });
@@ -218,18 +231,7 @@ export const updateStatusAddress = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
   const idAddressUpdate = req.params.addressId;
 
-  // Tìm và đặt isDefault thành false cho địa chỉ hiện tại đang là mặc định
-  const currentDefaultAddress = currentUser.addresses.find(
-    (address) => address.isDefault === true
-  );
-
-  //set isDefault cho address ti thay la false mang hien tai se la false
-  //Tat ca dang thao tac vo mang
-  if (currentDefaultAddress) {
-    currentDefaultAddress.isDefault = false;
-  }
-
-  // Tìm địa chỉ được truyền qua param và đặt isDefault thành true
+  // Tìm địa chỉ cần cập nhật
   const addressToUpdate = currentUser.addresses.find(
     (address) => address._id.toString() === idAddressUpdate
   );
@@ -237,17 +239,25 @@ export const updateStatusAddress = catchAsync(async (req, res, next) => {
   if (!addressToUpdate) {
     return next(new AppError('Address not found', 404));
   }
-  addressToUpdate.isDefault = true;
 
-  currentUser.addresses.sort((a, b) => b.isDefault - a.isDefault);
-
-  // Cập nhật user với danh sách địa chỉ mới
-  await User.findByIdAndUpdate(currentUser._id, {
-    addresses: currentUser.addresses,
+  // Đặt tất cả các địa chỉ isDefault thành false
+  currentUser.addresses.forEach((address) => {
+    address.isDefault = false;
   });
 
+  // Đặt địa chỉ được chọn thành true
+  addressToUpdate.isDefault = true;
+
+  // Cập nhật user với danh sách địa chỉ mới
+  await User.findByIdAndUpdate(
+    currentUser._id,
+    { addresses: currentUser.addresses },
+    { new: true } // Trả về dữ liệu mới nhất sau khi cập nhật
+  );
+
   return res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: currentUser.addresses,
   });
 });
@@ -296,7 +306,8 @@ export const addFavoriteProduct = catchAsync(async (req, res, next) => {
   );
   if (isExsitedIdFavoriteProduct)
     return res.status(StatusCodes.OK).json({
-      status: 'success',
+      status: true,
+      message: 'Thành công',
     });
 
   const favoriteProduct = await User.findByIdAndUpdate(
@@ -308,7 +319,8 @@ export const addFavoriteProduct = catchAsync(async (req, res, next) => {
   //Add new address
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: favoriteProduct,
   });
 });
@@ -325,7 +337,8 @@ export const removeFavoriteProduct = catchAsync(async (req, res, next) => {
   );
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: updatedUser,
   });
 });
@@ -344,7 +357,8 @@ export const getAllUser = catchAsync(async (req, res, next) => {
   const totalPages = Math.ceil(totalUsers / limit);
 
   res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: {
       users,
       pagination: {
@@ -390,16 +404,16 @@ export const getUserById = catchAsync(async (req, res, next) => {
           isDefault: address.isDefault,
           addressReceiver: {
             province: {
-              provinceCode: address.addressReceiver.province.code,
-              provinceName: provinceResponse.data.name,
+              code: address.addressReceiver.province.code,
+              name: provinceResponse.data.name,
             },
             district: {
-              districtCode: address.addressReceiver.district.code,
-              districtName: districtResponse.data.name,
+              code: address.addressReceiver.district.code,
+              name: districtResponse.data.name,
             },
             ward: {
-              wardCode: address.addressReceiver.ward.code,
-              wardName: wardResponse.data.name,
+              code: address.addressReceiver.ward.code,
+              name: wardResponse.data.name,
             },
           },
           _id: address._id,
@@ -417,7 +431,8 @@ export const getUserById = catchAsync(async (req, res, next) => {
   );
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: {
       _id: user._id,
       email: user.email,
@@ -449,7 +464,8 @@ export const toggleBlockUserById = catchAsync(async (req, res, next) => {
   await user.toggleBlockUser(shouldBlock);
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     message: shouldBlock
       ? 'Người dùng đã bị chặn thành công'
       : 'Người dùng đã được bỏ chặn thành công',
@@ -472,7 +488,8 @@ export const changeUserRole = catchAsync(async (req, res, next) => {
   await user.save();
 
   res.status(StatusCodes.OK).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     message: `Vai trò người dùng đã được thay đổi thành công thành ${user.role}`,
     data: user,
   });
