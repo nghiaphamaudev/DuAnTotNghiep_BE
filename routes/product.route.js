@@ -18,9 +18,9 @@ productRouter.get('/', getAllProducts);
 productRouter.post('/', uploadProductImages, createProduct);
 productRouter.get('/:id', getDetailProductById);
 productRouter.get('/slug/:slug', getDetailProductBySlug);
-productRouter.patch('/:id', uploadProductImages, updateProduct);
+productRouter.put('/:id', uploadProductImages, updateProduct);
 productRouter.delete('/:id', deleteProduct);
 productRouter.get('/:categoryId/related/:productId', relatedProduct);
-productRouter.delete('/:id/status', deleteProductStatus);
+productRouter.patch('/:id/status', deleteProductStatus);
 
 export default productRouter;

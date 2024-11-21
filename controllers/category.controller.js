@@ -1,6 +1,8 @@
+
 import catchAsync from '../utils/catchAsync.util';
 import Category from '../models/category.model';
 import AppError from '../utils/appError.util';
+import Product from '../models/product.model';
 
 export const getAllCategory = catchAsync(async (req, res, next) => {
   const categories = await Category.find();
@@ -74,5 +76,25 @@ export const createCategory = catchAsync(async (req, res, next) => {
   res.status(201).json({
     status: 'success',
     data: newCategory,
+  });
+});
+
+export const getCategoryById = catchAsync(async (req, res, next) => {
+  // Lấy danh mục theo ID từ request params
+  const category = await Category.findById(req.params.id);
+
+  // Kiểm tra xem danh mục có tồn tại không
+  if (!category) {
+    return next(new AppError('The ID category not existed!', 400));
+  }
+
+  // Lấy các sản phẩm thuộc danh mục
+  const products = await Product.find({ category: req.params.id });
+
+  // Phản hồi thành công
+  return res.status(200).json({
+    status: 'success',
+    category,
+    products,
   });
 });

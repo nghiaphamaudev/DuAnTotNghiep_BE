@@ -28,6 +28,7 @@ const variantSchema = new mongoose.Schema(
   {
     color: { type: String, required: true },
     images: [String],
+    imageFiles: [String],
     sizes: [sizeSchema],
   },
   {
@@ -59,7 +60,7 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    slug: { type: String, unique: true, required: true },
+    slug: { type: String },
   },
   {
     toJSON: {
