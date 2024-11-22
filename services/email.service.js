@@ -50,19 +50,32 @@ export const sendMailServiceConfirmOrder = async (
   totalPrice,
   products,
   to,
-  title
+  title,
+  receiver,
+  phoneNumber,
+  address
 ) => {
   try {
+    console.log(products);
     const mailOptions = {
       from: process.env.EMAIL_USERNAME, // địa chỉ email người gửi
       to: to, // địa chỉ email người nhận
       subject: title, // tiêu đề email // nội dung email
-      html: templateConfirmOrder1(
-        nameUser,
+      // html: templateConfirmOrder1(
+      //   nameUser,
+      //   orderId,
+      //   orderDate,
+      //   totalPrice,
+      //   products
+      // ),
+      html: templateConfirmOrder2(
         orderId,
         orderDate,
         totalPrice,
-        products
+        products,
+        receiver,
+        phoneNumber,
+        address
       ),
     };
 

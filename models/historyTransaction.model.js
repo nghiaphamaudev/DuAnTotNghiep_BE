@@ -16,11 +16,12 @@ const historyTransactionSchema = new mongoose.Schema(
       type: String,
     },
     type: {
-      type: Boolean,
-      required: true, // true - tiền mặt | false - chuyển khoản
+      type: String,
+      enum: ['Tiền mặt', 'Chuyển khoản'],
+      default: 'Tiền mặt',
     },
     totalMoney: {
-      type: String,
+      type: Number,
       required: true,
     },
     note: {
@@ -33,6 +34,7 @@ const historyTransactionSchema = new mongoose.Schema(
     },
   },
   {
+    timestamps: true,
     toJSON: {
       virtuals: true,
       transform: (_, ret) => {
@@ -44,7 +46,7 @@ const historyTransactionSchema = new mongoose.Schema(
       transform: (_, ret) => {
         delete ret._id;
       },
-      timestamps: true,
+
       versionKey: false,
     },
   }

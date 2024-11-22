@@ -26,7 +26,7 @@ export const createHistoryBill = catchAsync(async (req, res, next) => {
 });
 
 export const getHistoryBill = catchAsync(async (req, res, next) => {
-  //   const idBill = req.body.bill;
+  const idBill = req.para
   const data = await HistoryBill.find({ idBill: req.body.bill }).sort(
     'createdAt'
   );

@@ -80,7 +80,7 @@ const orderSchema = new mongoose.Schema(
         'Đóng gói chờ vận chuyển',
         'Đang giao hàng',
         'Đã giao hàng',
-        'Đã nhận được hàng',
+
         'Hoàn đơn',
         'Đã bị hủy',
       ],
