@@ -11,7 +11,7 @@ const sizeSchema = new mongoose.Schema(
       type: Boolean,
       required: true, // Đảm bảo trường status luôn có giá trị
       default: function () {
-        return this.inventory > 0; // Nếu inventory > 0 thì status là true, nếu không thì false
+        return this.inventory >= 0; // Nếu inventory > 0 thì status là true, nếu không thì false
       },
     },
   },
@@ -33,7 +33,7 @@ const sizeSchema = new mongoose.Schema(
 
 // Hook pre-save để cập nhật `status` dựa trên `inventory`
 sizeSchema.pre('save', function (next) {
-  this.status = this.inventory > 0; // Nếu inventory > 0, status là true
+  this.status = this.inventory >= 0; // Nếu inventory > 0, status là true
   next();
 });
 

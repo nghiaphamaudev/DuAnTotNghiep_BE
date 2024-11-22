@@ -2,6 +2,7 @@ import Product from '../models/product.model';
 import Cart from '../models/cart.model';
 import Order from '../models/order.model';
 import HistoryBill from '../models/historyBill.model';
+import HistoryTransaction from '../models/historyTransaction.model';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import { format } from 'date-fns';
@@ -13,6 +14,7 @@ import { checkAddressOrderSchema } from '../validator/user.validator';
 import { uploadProductImages } from '../middlewares/uploadCloud.middleware';
 import { createPaymentUrl } from '../services/payment.service';
 import { sendMailServiceConfirmOrder } from '../services/email.service';
+import { RollbackQuantityProduct } from '../utils/order.util';
 
 function calculateTotalPrice(items) {
   return items.reduce((total, item) => {
@@ -48,80 +50,105 @@ const updateCartAfterOrder = async (userId, orderItems) => {
   }
 };
 export const createOrder = catchAsync(async (req, res, next) => {
-  const userId = req.user.id; // Lấy ID người dùng từ token
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  const { orderItems, ...bodyData } = req.body; // Tách sản phẩm đã chọn và dữ liệu còn lại
-  const {
-    receiver,
-    phoneNumber,
-    address,
-    paymentMethod,
-    discountCode,
-    discountVoucher,
-    shippingCost,
-  } = bodyData;
+  try {
+    const userId = req.user.id;
+    const { orderItems, ...bodyData } = req.body;
+    const {
+      receiver,
+      phoneNumber,
+      address,
+      paymentMethod,
+      discountCode,
+      discountVoucher,
+      shippingCost,
+    } = bodyData;
 
-  // Kiểm tra tính hợp lệ của địa chỉ
-  const { error } = checkAddressOrderSchema.validate(
-    { receiver, phoneNumber, address },
-    { abortEarly: false }
-  );
-  if (error) {
-    const messages = error.details.map((item) => item.message);
-    return res.status(StatusCodes.BAD_REQUEST).json({ messages });
-  }
-
-  const code = `FS${dayjs().format('YYYYMMDDHHmmss')}`;
-  const totalPrice = calculateTotalPrice(orderItems);
-
-  const order = new Order({
-    userId,
-    code,
-    orderItems,
-    totalPrice,
-    receiver,
-    phoneNumber,
-    address,
-    paymentMethod,
-    discountCode,
-    shippingCost,
-    discountVoucher,
-  });
-
-  await order.save();
-  updateCartAfterOrder(userId, orderItems);
-
-  const historyBill = new HistoryBill({
-    userId: userId,
-    idBill: order.id,
-    creator: req.user.fullName,
-    role: req.user.role,
-    statusBill: 'Chờ xác nhận',
-    note: '',
-  });
-  await historyBill.save();
-
-  if (paymentMethod === 'VNPAY') {
-    const urlPayment = createPaymentUrl(
-      req,
-      totalPrice,
-      code,
-      `Thanh toán đơn hàng ${code}`
+    // Kiểm tra thông tin địa chỉ
+    const { error } = checkAddressOrderSchema.validate(
+      { receiver, phoneNumber, address },
+      { abortEarly: false }
     );
 
+    if (error) {
+      const messages = error.details.map((item) => item.message);
+      return res.status(StatusCodes.BAD_REQUEST).json({ messages });
+    }
+
+    // Tính tổng giá trị đơn hàng
+    const totalPrice = calculateTotalPrice(orderItems);
+
+    // Tạo mã đơn hàng
+    const code = `FS${dayjs().format('YYYYMMDDHHmmss')}`;
+
+    RollbackQuantityProduct(orderItems, next);
+
+    // Tạo đơn hàng
+    const order = new Order({
+      userId,
+      code,
+      orderItems,
+      totalPrice,
+      receiver,
+      phoneNumber,
+      address,
+      paymentMethod,
+      discountCode,
+      shippingCost,
+      discountVoucher,
+    });
+    await order.save({ session });
+
+    // Tạo lịch sử hóa đơn
+    const historyBill = new HistoryBill({
+      userId: userId,
+      idBill: order.id,
+      creator: req.user.fullName,
+      role: req.user.role,
+      statusBill: 'Chờ xác nhận',
+      note: '',
+    });
+    await historyBill.save({ session });
+
+    // Nếu thanh toán qua VNPAY, trả URL thanh toán
+    if (paymentMethod === 'VNPAY') {
+      const urlPayment = createPaymentUrl(
+        req,
+        totalPrice,
+        code,
+        `Thanh toán đơn hàng ${code}`
+      );
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return res.status(200).json({
+        status: true,
+        message: 'Đơn hàng được tạo thành công, chuyển hướng thanh toán',
+        data: { paymentUrl: urlPayment },
+      });
+    }
+
+    // Cập nhật giỏ hàng sau khi tạo đơn hàng
+    await updateCartAfterOrder(userId, orderItems);
+
+    await session.commitTransaction(); // Commit transaction
+    session.endSession();
+
     return res.status(200).json({
-      status: true,
-      message: 'Đơn hàng được tạo thành công, chuyển hướng thanh toán',
-      data: {
-        paymentUrl: urlPayment,
-      },
+      message: 'Thành công',
+      data: order,
+    });
+  } catch (error) {
+    await session.abortTransaction(); // Rollback nếu có lỗi
+    session.endSession();
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      status: false,
+      message: error.message,
     });
   }
-
-  return res.status(200).json({
-    message: 'Thành công',
-    data: order,
-  });
 });
 
 export const getAllOrderByUserId = catchAsync(async (req, res, next) => {
@@ -160,8 +187,7 @@ export const getAllOrderByUserId = catchAsync(async (req, res, next) => {
 });
 
 export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
-  const orderId = req.params.orderId;
-
+  const orderId = new mongoose.Types.ObjectId(req.params.orderId);
   // Tìm đơn hàng theo ID và populate các thông tin cần thiết
   const order = await Order.findById(orderId).populate({
     path: 'orderItems.productId',
@@ -185,7 +211,7 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
         productId: product._id,
         name: product.name,
         color: variant.color,
-        images: variant.images[0],
+        image: variant.images[0],
         size: size.nameSize,
         price: size.price,
         quantity: item.quantity,
@@ -200,16 +226,53 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     0
   );
 
+  //trả lại lịch sử đơn hàng
+  const historyBills = await HistoryBill.find({ idBill: orderId });
+  const formattedHistoryBills = historyBills.map((bill) => ({
+    createdAt: format(new Date(bill.createdAt), 'dd/MM/yyyy HH:mm:ss'),
+    creator: bill.creator,
+    role: bill.role,
+    status: bill.statusBill,
+    note: bill.note,
+  }));
+
+  // trả lại thông tin đơn hàng
+
+  const orderInfor = {
+    orderId: order._id,
+    code: order.code,
+    creator: req.user.fullName,
+    address: order.address,
+    paymentMethod: order.paymentMethod,
+    phoneNumber: order.phoneNumber,
+    status: order.status,
+    receiver: order.receiver,
+  };
+
+  // trả lại lịch sử thanh toán
+
+  const historyTransaction = await HistoryTransaction.findOne({
+    idBill: orderId,
+  });
+  const formattedHistoryTransaction = {
+    totalPrice: historyTransaction.totalMoney,
+    type: historyTransaction.type,
+    createdAt: format(
+      new Date(historyTransaction.createdAt),
+      'dd/MM/yyyy HH:mm:ss'
+    ),
+  };
+
   res.status(200).json({
     status: true,
-    message: 'Lấy chi tiết đơn hàng thành công.',
+    message: 'Lấy thành công.',
     data: {
-      orderId: order._id,
-      code: order.code,
+      orderInfor: orderInfor,
       totalOrderPrice, // Tổng giá tiền của đơn hàng
       createdAt: format(new Date(order.createdAt), 'dd/MM/yyyy HH:mm:ss'),
-      status: order.status,
       orderItems: orderDetails,
+      historyBill: formattedHistoryBills,
+      historyTransaction: formattedHistoryTransaction,
     },
   });
 });
@@ -219,6 +282,7 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
 
   const nameUser = getLastName(currentUser.fullName);
   const { idOrder, status, statusShip } = req.body;
+  console.log(status);
   const id = new mongoose.Types.ObjectId(idOrder);
   if (!status) {
     return next(
@@ -240,7 +304,12 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
       new AppError('Không tìm thấy đơn hàng.', StatusCodes.NOT_FOUND)
     );
   }
+  const address = updateOrder.address;
+  const receiver = updateOrder.receiver;
+  const phoneNumber = updateOrder.phoneNumber;
+  const code = updateOrder.code;
 
+  const formatPrice = (price) => price.toLocaleString('vi-VN');
   //Lay chi tiet don hang
   const orderDetails = await Promise.all(
     updateOrder.orderItems.map(async (item) => {
@@ -270,22 +339,55 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     0
   );
 
-  if (status === 'Đã xác nhận') {
-    const orderDate = format(
-      new Date(updateOrder.createdAt),
-      'dd/MM/yyyy HH:mm:ss'
-    );
-    const title = `Xác Nhận Đơn Hàng #${updateOrder.code} - Cảm ơn bạn đã mua sắm tại FShirt`;
-    await sendMailServiceConfirmOrder(
-      nameUser,
-      updateOrder._id,
-      orderDate,
-      totalOrderPrice,
-      orderDetails,
-      currentUser.email,
-      title
-    );
+  // if (status === 'Đã xác nhận') {
+  //   const orderDate = format(
+  //     new Date(updateOrder.createdAt),
+  //     'dd/MM/yyyy HH:mm:ss'
+  //   );
+  //   const title = `Xác Nhận Đơn Hàng #${updateOrder.code} - Cảm ơn bạn đã mua sắm tại FShirt`;
+  //   await sendMailServiceConfirmOrder(
+  //     nameUser,
+  //     code,
+  //     orderDate,
+  //     totalOrderPrice,
+  //     orderDetails,
+  //     currentUser.email,
+  //     title,
+  //     receiver,
+  //     phoneNumber,
+  //     address
+  //   );
+  //   // await sendMailServiceConfirmOrder1(
+  //   //   nameUser,
+  //   //   updateOrder._id,
+  //   //   orderDate,
+  //   //   totalOrderPrice,
+  //   //   orderDetails,
+  //   //   currentUser.email,
+  //   //   title,
+  //   // );
+  // }
+
+  if (status === 'Hoàn thành') {
+    const historyTransaction = new HistoryTransaction({
+      idUser: req.user.id,
+      idBill: id,
+      totalMoney: totalOrderPrice,
+      note: '',
+      status: true,
+    });
+    await historyTransaction.save();
   }
+
+  const historyBill = new HistoryBill({
+    userId: req.user.id,
+    idBill: id,
+    creator: req.user.fullName,
+    role: req.user.role,
+    statusBill: status,
+    note: req.body.note || '',
+  });
+  await historyBill.save();
 
   res.status(200).json({
     status: true,
