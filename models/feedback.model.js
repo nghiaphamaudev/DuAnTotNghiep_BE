@@ -20,10 +20,24 @@ const feedbackSchema = new mongoose.Schema(
     likedBy: [{ type: mongoose.Schema.ObjectId, ref: 'User' }],
   },
   {
-    versionKey: false,
-    timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+      timestamps: true,
+      versionKey: false,
+    },
   }
 );
-
+feedbackSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
 const Feedback = mongoose.model('Feedback', feedbackSchema);
 export default Feedback;

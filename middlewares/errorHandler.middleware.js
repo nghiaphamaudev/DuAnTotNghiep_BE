@@ -7,7 +7,7 @@ const handleValidatorError = (error) => {
 };
 
 const handleCastError = (error) => {
-  const message = 'The ID product not existed!';
+  const message = 'ID sản phẩm không tồn tại!';
   return new AppError(message, StatusCodes.BAD_REQUEST);
 };
 
@@ -18,12 +18,12 @@ const handleDuplicateDB = (error) => {
     value.replace(value[0], value[0].toUpperCase())
   );
   values = values.join(' ');
-  const message = `${values} has exsisted . Try again!`;
+  const message = `${values} đã tồn tại . Thử lại!`;
   return new AppError(message, StatusCodes.BAD_REQUEST);
 };
 
 const handleJWTExpired = (error) => {
-  const message = 'Your session has expired. Please log in again.';
+  const message = 'Phiên đăng nhập của bạn đã hết hạn. Vui lòng đăng nhập lại.';
   return new AppError(message, StatusCodes.BAD_REQUEST);
 };
 
@@ -46,13 +46,14 @@ const sendErrorProd = (err, req, res) => {
   }
   if (err.isOperational) {
     res.status(err.statusCode).json({
-      status: err.status,
+      status: false,
       message: err.message,
+      data: null,
     });
   } else {
     res.status(500).json({
       status: 'error',
-      message: 'Something went wrong!!',
+      message: 'Có gì đó không ổn!!',
     });
   }
 };

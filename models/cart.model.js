@@ -1,32 +1,49 @@
 import mongoose from 'mongoose';
 
-const cartSchema = new mongoose.Schema(
+const cartItemSchema = new mongoose.Schema(
   {
-    userId: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'User', // Tham chiếu tới bảng người dùng
-      required: true,
-    },
     productId: {
       type: mongoose.Schema.ObjectId,
-      ref: 'Product', // Tham chiếu tới bảng sản phẩm
+      ref: 'Product',
       required: true,
     },
-    variantId: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'Product.variants', // Tham chiếu tới biến thể của sản phẩm
-      required: true,
+    variantId: { type: String, required: true },
+    sizeId: { type: String, required: true },
+    quantity: { type: Number, required: true, min: 1 },
+  },
+  {
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
     },
-    sizeId: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'Product.variants.sizes', // Tham chiếu tới size của sản phẩm
-      required: true,
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
     },
-    quantity: {
-      type: Number,
-      default: 1,
-      min: 1,
-    },
+  }
+);
+
+// Trường ảo tính tổng tiền cho mỗi sản phẩm trong giỏ hàng
+cartItemSchema.virtual('totalItemPrice').get(function () {
+  if (this.productId && this.productId.price) {
+    return this.quantity * this.productId.price;
+  }
+  return 0;
+});
+
+cartItemSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
+
+// Schema giỏ hàng
+const cartSchema = new mongoose.Schema(
+  {
+    userId: { type: mongoose.Schema.ObjectId, ref: 'User', required: true },
+    items: [cartItemSchema], // Danh sách sản phẩm trong giỏ hàng
   },
   {
     toObject: { virtuals: true },
@@ -36,5 +53,11 @@ const cartSchema = new mongoose.Schema(
   }
 );
 
+// Trường ảo tính tổng tiền của giỏ hàng
+cartSchema.virtual('total').get(function () {
+  return this.items.reduce((acc, item) => acc + item.totalItemPrice, 0);
+});
+
+// Tạo model cho giỏ hàng
 const Cart = mongoose.model('Cart', cartSchema);
 export default Cart;
