@@ -9,6 +9,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const DB = process.env.DATABASE_LOCAL;
+const DB_URL = process.env.DATABASE_URL;
 const PORT = process.env.PORT;
 
 io.on('connection', (socket) => {
@@ -25,7 +26,7 @@ io.on('connection', (socket) => {
   });
 });
 
-connectDB(DB);
+connectDB(DB_URL);
 
 app.listen(PORT, () => {
   console.log(`The server is listening at ${PORT}...`);

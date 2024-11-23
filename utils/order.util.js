@@ -2,7 +2,12 @@ import Product from '../models/product.model';
 import mongoose from 'mongoose';
 import AppError from './appError.util';
 import { StatusCodes } from 'http-status-codes';
-export async function RollbackQuantityProduct(orderItems, next) {
+
+export async function RollbackQuantityProduct(
+  orderItems,
+  next,
+  isCancel = false
+) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -30,17 +35,26 @@ export async function RollbackQuantityProduct(orderItems, next) {
         );
       }
 
+      // Nếu là hủy đơn, cộng lại số lượng sản phẩm
+      const updateOperation = isCancel
+        ? {
+            $inc: {
+              'variants.$[variant].sizes.$[size].inventory': item.quantity,
+            },
+          } // Cộng lại
+        : {
+            $inc: {
+              'variants.$[variant].sizes.$[size].inventory': -item.quantity,
+            },
+          }; // Trừ đi
+
       const result = await Product.updateOne(
         {
           _id: item.productId,
           'variants._id': item.variantId,
           'variants.sizes._id': item.sizeId,
         },
-        {
-          $inc: {
-            'variants.$[variant].sizes.$[size].inventory': -item.quantity,
-          },
-        },
+        updateOperation,
         {
           session,
           arrayFilters: [
@@ -53,10 +67,9 @@ export async function RollbackQuantityProduct(orderItems, next) {
         }
       );
 
-      console.log('Update result:', result);
       if (result.modifiedCount === 0) {
         throw new AppError(
-          `Không thể trừ tồn kho cho sản phẩm với ID: ${item.productId}, màu: ${item.variantId}, size: ${item.sizeId}.`,
+          `Không thể cập nhật tồn kho cho sản phẩm với ID: ${item.productId}, màu: ${item.variantId}, size: ${item.sizeId}.`,
           StatusCodes.BAD_REQUEST
         );
       }
