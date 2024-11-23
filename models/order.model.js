@@ -29,12 +29,6 @@ const orderItemSchema = new mongoose.Schema(
 );
 
 // Trường ảo tính tổng tiền cho mỗi sản phẩm trong giỏ hàng
-orderItemSchema.virtual('totalItemPrice').get(function () {
-  if (this.productId && this.productId.price) {
-    return this.quantity * this.productId.price;
-  }
-  return 0;
-});
 
 orderItemSchema.virtual('id').get(function () {
   return this._id.toHexString();
@@ -80,9 +74,8 @@ const orderSchema = new mongoose.Schema(
         'Đóng gói chờ vận chuyển',
         'Đang giao hàng',
         'Đã giao hàng',
-
         'Hoàn đơn',
-        'Đã bị hủy',
+        'Đã hủy',
       ],
       default: 'Chờ xác nhận',
     },

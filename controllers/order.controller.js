@@ -49,6 +49,7 @@ const updateCartAfterOrder = async (userId, orderItems) => {
     console.error('Lỗi khi cập nhật giỏ hàng:', error);
   }
 };
+
 export const createOrder = catchAsync(async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -56,6 +57,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { orderItems, ...bodyData } = req.body;
+
     const {
       receiver,
       phoneNumber,
@@ -279,38 +281,46 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
 
 export const updateStatusOrder = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
-
   const nameUser = getLastName(currentUser.fullName);
   const { idOrder, status, statusShip } = req.body;
-  console.log(status);
+
   const id = new mongoose.Types.ObjectId(idOrder);
+  let updateOrder = await Order.findById(id);
+
   if (!status) {
     return next(
       new AppError('Chuyển trạng thái thất bại', StatusCodes.BAD_REQUEST)
     );
   }
 
-  let updateOrder = await Order.findByIdAndUpdate(
-    id,
-    { $set: { status, statusShip } },
-    { new: true }
-  ).populate({
-    path: 'orderItems.productId',
-    select: 'name coverImg variants ',
-  });
-
   if (!updateOrder) {
     return next(
       new AppError('Không tìm thấy đơn hàng.', StatusCodes.NOT_FOUND)
     );
   }
-  const address = updateOrder.address;
-  const receiver = updateOrder.receiver;
-  const phoneNumber = updateOrder.phoneNumber;
-  const code = updateOrder.code;
 
-  const formatPrice = (price) => price.toLocaleString('vi-VN');
-  //Lay chi tiet don hang
+  if (status === 'Đã hủy' || status === 'Hoàn đơn') {
+    try {
+      // Rollback số lượng sản phẩm trong kho
+      await RollbackQuantityProduct(updateOrder.orderItems, next, true);
+    } catch (error) {
+      return next(
+        new AppError(
+          'Không thể rollback số lượng sản phẩm.',
+          StatusCodes.INTERNAL_SERVER_ERROR
+        )
+      );
+    }
+  }
+  updateOrder = await Order.findByIdAndUpdate(
+    id,
+    { $set: { status, statusShip } },
+    { new: true }
+  ).populate({
+    path: 'orderItems.productId',
+    select: 'name coverImg variants',
+  });
+
   const orderDetails = await Promise.all(
     updateOrder.orderItems.map(async (item) => {
       const product = item.productId;
@@ -333,40 +343,10 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     })
   );
 
-  // Tính tổng giá tiền cho đơn hàng (có thể đã được lưu nhưng tính lại để đảm bảo)
   const totalOrderPrice = orderDetails.reduce(
     (acc, item) => acc + item.totalItemPrice,
     0
   );
-
-  // if (status === 'Đã xác nhận') {
-  //   const orderDate = format(
-  //     new Date(updateOrder.createdAt),
-  //     'dd/MM/yyyy HH:mm:ss'
-  //   );
-  //   const title = `Xác Nhận Đơn Hàng #${updateOrder.code} - Cảm ơn bạn đã mua sắm tại FShirt`;
-  //   await sendMailServiceConfirmOrder(
-  //     nameUser,
-  //     code,
-  //     orderDate,
-  //     totalOrderPrice,
-  //     orderDetails,
-  //     currentUser.email,
-  //     title,
-  //     receiver,
-  //     phoneNumber,
-  //     address
-  //   );
-  //   // await sendMailServiceConfirmOrder1(
-  //   //   nameUser,
-  //   //   updateOrder._id,
-  //   //   orderDate,
-  //   //   totalOrderPrice,
-  //   //   orderDetails,
-  //   //   currentUser.email,
-  //   //   title,
-  //   // );
-  // }
 
   if (status === 'Hoàn thành') {
     const historyTransaction = new HistoryTransaction({
