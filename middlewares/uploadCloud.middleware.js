@@ -35,7 +35,30 @@ const productStorage = new CloudinaryStorage({
   },
 });
 
+<<<<<<< HEAD
+
+//tạo storage cho feedback 
+const feedbackStorage = new CloudinaryStorage({
+  cloudinary: cloudinary.v2,
+  params: {
+    folder: 'feedbacks', // Thư mục cho feedback
+    format: 'jpg', // Định dạng ảnh
+    public_id: () => uuidv4(), // Tạo public_id ngẫu nhiên
+  },
+});
+
+
+
+
+// Middleware cho feedback, cho phép upload tối đa 4 ảnh
+const uploadFeedbackCloud = multer({ storage: feedbackStorage }).fields([
+  { name: 'images', maxCount: 4 }, // Tối đa 4 ảnh cho feedback
+]);
+
+// Middleware cho product, cho phép upload tối đa 4 ảnh
+=======
 // Middleware cho product, cho phép upload tối đa 4 ảnh cho mỗi trường images và imageFiles
+>>>>>>> 4237436d89bbe750035e532b32e92a392929d2a8
 const uploadProductCloud = multer({ storage: productStorage }).fields([
   { name: 'coverImage', maxCount: 1 },
   ...Array.from({ length: 10 }, (_, index) => ([
@@ -69,3 +92,4 @@ export const cloudinaryDelete = async (imageUrls) => {
 // Xuất middleware
 export const uploadUserImage = uploadUserCloud;
 export const uploadProductImages = uploadProductCloud;
+export const uploadFeedbackImages = uploadFeedbackCloud;

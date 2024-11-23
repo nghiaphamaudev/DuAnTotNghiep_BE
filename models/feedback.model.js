@@ -17,6 +17,7 @@ const feedbackSchema = new mongoose.Schema(
     comment: { type: String, required: false, default: '' },
     images: [String], //mở rộng
     like: { type: Number, require: false, default: 0 },
+    likedBy: [{ type: mongoose.Schema.ObjectId, ref: 'User' }],
   },
   {
     toJSON: {
