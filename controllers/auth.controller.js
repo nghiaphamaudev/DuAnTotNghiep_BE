@@ -10,6 +10,7 @@ import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  updatePasswordSchema,
 } from '../validator/user.validator';
 import { sendMailServiceForgotPassword } from '../services/email.service';
 
@@ -34,9 +35,10 @@ const createSendRes = (user, statusCode, res) => {
   res.cookie('jwt', token, cookieOptions);
   user.password = undefined;
   res.status(statusCode).json({
-    status: 'success',
+    status: true,
     data: user,
     accessToken: token,
+    message: 'Thành công',
   });
 };
 
@@ -52,18 +54,26 @@ export const register = catchAsync(async (req, res, next) => {
     return res.status(StatusCodes.BAD_REQUEST).json({ messages });
   }
 
-  //Check email tồn tại
-  const existedUser = await User.findOne({ email });
+  // kiểm tra email đã tồn tại chưa
+  const existedUser = await User.findOne({
+    $or: [{ email }, { phoneNumber }],
+  });
+
   if (existedUser) {
+    const conflictField =
+      existedUser.email === email ? 'Email' : 'Số điện thoại';
     return next(
       new AppError(
-        'Email đã tồn tại, vui lòng sử dụng email khác!',
+        `${conflictField} đã được đăng ký, vui lòng sử dụng ${conflictField.toLowerCase()} khác!`,
         StatusCodes.BAD_REQUEST
       )
     );
   }
-  const newUser = await User.create({ email, fullName, password, phoneNumber });
-  createSendRes(newUser, StatusCodes.CREATED, res);
+  await User.create({ email, fullName, password, phoneNumber });
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Thành công',
+  });
 });
 
 export const login = catchAsync(async (req, res, next) => {
@@ -112,7 +122,10 @@ export const protect = catchAsync(async (req, res, next) => {
   }
   if (!token) {
     return next(
-      new AppError('Bạn chưa đăng nhập, vui lòng đăng nhập để tiếp tục')
+      new AppError(
+        'Bạn chưa đăng nhập, vui lòng đăng nhập để tiếp tục',
+        StatusCodes.UNAUTHORIZED
+      )
     );
   }
   // Kiểm tra trong trường hợp người dùng này đã bị xóa  nhưng vẫn có token để đăng nhập
@@ -175,9 +188,7 @@ export const forgotPassword = catchAsync(async (req, res, next) => {
   const resetToken = user.createPasswordResetToken();
   await user.save({ validateBeforeSave: false });
   //3) Sent it to email
-  const resetURL = `${req.protocol}://${req.get(
-    'host'
-  )}/api/v1/users/resetPassword/${resetToken}`;
+  const resetURL = `http://localhost:5173/resetPassword/${resetToken}`;
   try {
     await sendMailServiceForgotPassword(
       user.email,
@@ -186,7 +197,7 @@ export const forgotPassword = catchAsync(async (req, res, next) => {
     );
 
     res.status(StatusCodes.OK).json({
-      status: 'success',
+      status: true,
       message: 'Token đặt lại mật khẩu đã được gửi đến email của bạn!',
     });
   } catch (error) {
@@ -243,10 +254,9 @@ export const resetPassword = catchAsync(async (req, res, next) => {
 });
 
 export const updatePassword = catchAsync(async (req, res, next) => {
-  //Validate password và passwordConfirm
   const { password, passwordConfirm, passwordCurrent } = req.body;
-  const { error } = resetPasswordSchema.validate(
-    { password, passwordConfirm },
+  const { error } = updatePasswordSchema.validate(
+    { passwordCurrent, passwordConfirm, password },
     { abortEarly: false }
   );
   if (error) {
@@ -264,10 +274,28 @@ export const updatePassword = catchAsync(async (req, res, next) => {
     return next(
       new AppError('Mật khẩu hiện tại không đúng', StatusCodes.UNAUTHORIZED)
     );
+  //Check password có giống vơi mật khẩu cũ không
+  if (password === passwordCurrent) {
+    return next(
+      new AppError(
+        'Mật khẩu đã từng tồn tại. Vui lòng dùng mật khẩu khác!',
+        StatusCodes.BAD_REQUEST
+      )
+    );
+  }
+  if (passwordConfirm !== password)
+    return next(
+      new AppError('Mật khẩu phải trùng khớp!', StatusCodes.BAD_REQUEST)
+    );
+
   //Cập nhật new password
   currentUser.password = password;
   await currentUser.save();
-  createSendRes(currentUser, StatusCodes.CREATED, res);
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Cập nhật thành công!',
+    data: null,
+  });
 });
 
 export const logout = (req, res) => {
@@ -275,5 +303,5 @@ export const logout = (req, res) => {
     expires: new Date(Date.now() + 10 * 1000),
     httpOnly: true,
   });
-  res.status(StatusCodes.OK).json({ status: 'success' });
+  res.status(StatusCodes.OK).json({ status: 'true' });
 };

@@ -5,15 +5,23 @@ import {
   createCategory,
   getAllCategory,
   getCategoryById,
+  getCategory,
 } from '../controllers/category.controller';
+import { uploadCategoryImage } from '../middlewares/uploadCloud.middleware';
+
 const categoryRouter = express.Router();
-
-categoryRouter.route('/').get(getAllCategory).post(createCategory);
-
+categoryRouter
+  .route('/')
+  .get(getAllCategory)
+  .post(uploadCategoryImage, createCategory);
 categoryRouter
   .route('/:id')
-  .delete(deleteCategory)
-  .patch(updateCategory)
   .get(getCategoryById)
+  .delete(deleteCategory)
+  .patch(uploadCategoryImage, updateCategory);
+
+categoryRouter
+  .route('/detail/:id')
+  .get(getCategory)
 
 export default categoryRouter;
