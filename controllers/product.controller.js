@@ -36,11 +36,15 @@ export const createProduct = catchAsync(async (req, res, next) => {
   // Tách ảnh của các biến thể
   const variantImages0 = req.files['variants[0][images]'] || [];
   const variantImages1 = req.files['variants[1][images]'] || [];
+  const variantImages2 = req.files['variants[2][images]'] || [];
+  const variantImages3 = req.files['variants[3][images]'] || [];
 
   // Nhóm ảnh biến thể theo từng biến thể
   const imagesByVariant = {
     0: variantImages0.map((file) => file.path),
     1: variantImages1.map((file) => file.path),
+    2: variantImages2.map((file) => file.path),
+    3: variantImages3.map((file) => file.path),
   };
 
   // Chuẩn bị dữ liệu sản phẩm
