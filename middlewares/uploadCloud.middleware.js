@@ -35,7 +35,16 @@ const productStorage = new CloudinaryStorage({
   },
 });
 
-<<<<<<< HEAD
+// Tạo storage cho Category (chỉ upload 1 ảnh)
+const categoryStorage = new CloudinaryStorage({
+  cloudinary: cloudinary.v2,
+  params: {
+    folder: 'categories',
+    format: 'jpg',
+    public_id: () => uuidv4(),
+  },
+});
+
 
 //tạo storage cho feedback 
 const feedbackStorage = new CloudinaryStorage({
@@ -55,10 +64,6 @@ const uploadFeedbackCloud = multer({ storage: feedbackStorage }).fields([
   { name: 'images', maxCount: 4 }, // Tối đa 4 ảnh cho feedback
 ]);
 
-// Middleware cho product, cho phép upload tối đa 4 ảnh
-=======
-// Middleware cho product, cho phép upload tối đa 4 ảnh cho mỗi trường images và imageFiles
->>>>>>> 4237436d89bbe750035e532b32e92a392929d2a8
 const uploadProductCloud = multer({ storage: productStorage }).fields([
   { name: 'coverImage', maxCount: 1 },
   ...Array.from({ length: 10 }, (_, index) => ([
@@ -69,6 +74,10 @@ const uploadProductCloud = multer({ storage: productStorage }).fields([
 
 // Middleware cho user, chỉ cho phép upload 1 ảnh
 const uploadUserCloud = multer({ storage: userStorage }).single('image');
+
+// Middleware cho category, chỉ cho phép upload 1 ảnh
+const uploadCategoryCloud = multer({ storage: categoryStorage }).single('imageCategory');
+
 
 export const cloudinaryDelete = async (imageUrls) => {
   try {
@@ -92,4 +101,6 @@ export const cloudinaryDelete = async (imageUrls) => {
 // Xuất middleware
 export const uploadUserImage = uploadUserCloud;
 export const uploadProductImages = uploadProductCloud;
+export const uploadCategoryImage = uploadCategoryCloud;
 export const uploadFeedbackImages = uploadFeedbackCloud;
+
