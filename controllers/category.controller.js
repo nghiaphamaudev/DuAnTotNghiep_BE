@@ -26,26 +26,25 @@ export const getCategory = catchAsync(async (req, res, next) => {
 });
 
 //Thay đổi trạng thái danh mục set active
-export const deleteCategory = catchAsync(async (req, res, next) => {
-  const category = await Category.findByIdAndUpdate(
-    req.params.id,
-    { active: false },
-    {
-      new: true,
-      runValidators: true,
-    }
-  );
-
+export const deleteCategory = async (req, res, next) => {
+  const { id } = req.params;
+  const category = await Category.findById(id);
   if (!category) {
-    return next(new AppError('The ID category not existed!', 400));
+    return next(new AppError('Category not found', 404));
   }
-
-  return res.status(200).json({
-    status: true,
-    message: 'Thành công',
-    data: category,
+  category.active = !category.active;
+  await category.save();
+  res.status(200).json({
+    status: 'success',
+    data: {
+      id: category.id,
+      active: category.active,
+    },
   });
-});
+};
+
+
+
 export const updateCategory = catchAsync(async (req, res, next) => {
   const { name } = req.body;
   if (!name && !req.file) {

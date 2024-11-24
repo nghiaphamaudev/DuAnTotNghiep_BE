@@ -17,11 +17,13 @@ categoryRouter
 categoryRouter
   .route('/:id')
   .get(getCategoryById)
-  .delete(deleteCategory)
   .patch(uploadCategoryImage, updateCategory);
 
 categoryRouter
   .route('/detail/:id')
   .get(getCategory)
+categoryRouter
+  .route('/:id/status')
+  .patch(deleteCategory)
 
 export default categoryRouter;
