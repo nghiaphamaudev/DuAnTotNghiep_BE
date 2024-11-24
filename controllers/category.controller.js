@@ -4,6 +4,7 @@ import Category from '../models/category.model';
 import AppError from '../utils/appError.util';
 import Product from '../models/product.model';
 
+
 export const getAllCategory = catchAsync(async (req, res, next) => {
   const categories = await Category.find();
   return res.status(200).json({

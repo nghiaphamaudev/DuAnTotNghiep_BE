@@ -248,6 +248,7 @@ export const relatedProduct = catchAsync(async (req, res, next) => {
   });
 });
 
+
 export const deleteProduct = catchAsync(async (req, res, next) => {
   const product = await Product.findByIdAndDelete(req.params.id);
   if (!product) {
