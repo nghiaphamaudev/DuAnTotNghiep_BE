@@ -145,6 +145,13 @@ export const protect = catchAsync(async (req, res, next) => {
       )
     );
   }
+  if (currentUser.active === false)
+    return next(
+      new AppError(
+        'Tài khoản của bạn đã bị chặn. Vui lòng liên hệ với quản trị viên',
+        StatusCodes.UNAUTHORIZED
+      )
+    );
   req.user = currentUser;
   req.user.id = decoded.id;
   next();
