@@ -100,14 +100,14 @@ export const createOrder = catchAsync(async (req, res, next) => {
     if (discountCode) {
       const voucher = await Voucher.findOne({ code: discountCode });
 
-      // if (voucher.userIds.includes(userId)) {
-      //   return next(
-      //     new AppError(
-      //       'Bạn đã sử dụng voucher này rồi',
-      //       StatusCodes.BAD_REQUEST
-      //     )
-      //   );
-      // }
+      if (voucher.userIds.includes(userId)) {
+        return next(
+          new AppError(
+            'Bạn đã sử dụng voucher này rồi',
+            StatusCodes.BAD_REQUEST
+          )
+        );
+      }
       await Voucher.findOneAndUpdate(
         { code: discountCode },
         { $push: { userIds: userId }, $inc: { usedCount: 1, quantity: -1 } }
