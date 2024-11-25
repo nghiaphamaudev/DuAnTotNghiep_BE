@@ -457,7 +457,8 @@ export const getUserById = catchAsync(async (req, res, next) => {
 
 export const toggleBlockUserById = catchAsync(async (req, res, next) => {
   const userId = req.params.userId;
-  const { shouldBlock } = req.body;
+  const { shouldBlock, note } = req.body;
+  console.log(note);
 
   const user = await User.findById(userId);
   if (!user) {
@@ -466,8 +467,9 @@ export const toggleBlockUserById = catchAsync(async (req, res, next) => {
     );
   }
 
-  await user.toggleBlockUser(shouldBlock);
-
+  if (note) {
+    await user.toggleBlockUser(shouldBlock);
+  }
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'Thành công',
