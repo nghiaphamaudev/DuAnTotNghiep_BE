@@ -344,16 +344,21 @@ export const removeFavoriteProduct = catchAsync(async (req, res, next) => {
 });
 
 export const getAllUser = catchAsync(async (req, res, next) => {
+  // Lấy id user hiện tại từ req.user (middleware xác thực)
+  const currentUserId = req.user.id;
+
   // Lấy số trang và số bản ghi trên mỗi trang từ query params
   const page = parseInt(req.query.page) || 1; // Mặc định là trang 1
   const limit = 6; // Số bản ghi trên mỗi trang
   const skip = (page - 1) * limit;
 
-  // Tìm tất cả người dùng với giới hạn và phân trang
-  const users = await User.find().skip(skip).limit(limit);
+  // Tìm tất cả người dùng ngoại trừ user hiện tại với giới hạn và phân trang
+  const users = await User.find({ _id: { $ne: currentUserId } })
+    .skip(skip)
+    .limit(limit);
 
-  // Đếm tổng số người dùng để trả về tổng số trang
-  const totalUsers = await User.countDocuments();
+  // Đếm tổng số người dùng (ngoại trừ user hiện tại) để tính tổng số trang
+  const totalUsers = await User.countDocuments({ _id: { $ne: currentUserId } });
   const totalPages = Math.ceil(totalUsers / limit);
 
   res.status(200).json({
