@@ -6,7 +6,12 @@ import { Server } from 'socket.io';
 dotenv.config();
 
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: 'http://localhost:3000', // Địa chỉ frontend
+    methods: ['GET', 'POST'],
+  },
+});
 
 const DB = process.env.DATABASE_LOCAL;
 const DB_URL = process.env.DATABASE_URL;
