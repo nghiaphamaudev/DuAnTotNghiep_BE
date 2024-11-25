@@ -53,6 +53,7 @@ userRouter
   .patch(removeFavoriteProduct);
 
 /**************ADMIN-USER-MANAGEMENT****************/
+userRouter.use(restrictTo('admin'));
 userRouter.get('/admin', getAllUser);
 userRouter.patch('/admin/:userId/toggle-block', toggleBlockUserById);
 userRouter.patch('/admin/:userId/change-user-role', changeUserRole);
