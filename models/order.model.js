@@ -86,7 +86,6 @@ const orderSchema = new mongoose.Schema(
     },
     discountVoucher: {
       type: Number,
-      required: true,
     },
     statusShip: {
       type: Boolean,
