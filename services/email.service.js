@@ -86,3 +86,104 @@ export const sendMailServiceConfirmOrder = async (
     throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
   }
 };
+
+export const sendMaiBlockedOrder = async (to, subject, nameUser, note) => {
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USERNAME, // địa chỉ email người gửi
+      to: to, // địa chỉ email người nhận
+      subject: subject, // tiêu đề email // nội dung email
+      html: `
+          <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Locked</title>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 20px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background-color: #ff4d4d;
+      color: #ffffff;
+      padding: 20px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .content {
+      padding: 20px;
+      color: #333333;
+      line-height: 1.6;
+    }
+    .content p {
+      margin: 0 0 10px;
+    }
+    .footer {
+      background-color: #f4f4f4;
+      color: #666666;
+      text-align: center;
+      padding: 10px;
+      font-size: 14px;
+    }
+    .button {
+      display: inline-block;
+      margin-top: 20px;
+      background-color: #ff4d4d;
+      color: #ffffff;
+      padding: 10px 20px;
+      border-radius: 5px;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .button:hover {
+      background-color: #cc0000;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
+      <h1>Cảnh Báo: Tài Khoản Bị Khóa</h1>
+    </div>
+    <div class="content">
+      <p>Xin chào ${nameUser},</p>
+      <p>Chúng tôi muốn thông báo rằng tài khoản của bạn đã bị khóa do ${note}.</p>
+      <p>Nếu bạn nghĩ rằng đây là một sai sót, vui lòng liên hệ với đội ngũ hỗ trợ của chúng tôi để được giúp đỡ.</p>
+      <a href="[link hỗ trợ]" class="button">Liên Hệ Hỗ Trợ</a>
+      <p>Chúng tôi xin lỗi vì sự bất tiện này và cảm ơn bạn đã sử dụng dịch vụ của chúng tôi.</p>
+      <p>Trân trọng,</p>
+      <p>Đội ngũ hỗ trợ</p>
+    </div>
+    <div class="footer">
+      <p>© 2024 Công ty của bạn. Mọi quyền được bảo lưu.</p>
+      <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+    </div>
+  </div>
+</body>
+</html>
+
+        `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email đã được gửi:', info.response);
+  } catch (error) {
+    console.error('Lỗi khi gửi email:', error);
+    throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
+  }
+};

@@ -167,11 +167,11 @@ userSchema.methods.createPasswordResetToken = function () {
   return resetToken;
 };
 
-// Phương thức để chặn hoặc bỏ chặn người dùng
-userSchema.methods.toggleBlockUser = function (shouldBlock) {
-  this.active = !shouldBlock;
-  return this.save();
-};
+// // Phương thức để chặn hoặc bỏ chặn người dùng
+// userSchema.methods.toggleBlockUser = function (shouldBlock) {
+//   this.active = !shouldBlock;
+//   return this.save();
+// };
 
 const User = mongoose.model('User', userSchema);
 export default User;
