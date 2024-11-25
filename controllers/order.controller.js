@@ -15,12 +15,25 @@ import { uploadProductImages } from '../middlewares/uploadCloud.middleware';
 import { createPaymentUrl } from '../services/payment.service';
 import { sendMailServiceConfirmOrder } from '../services/email.service';
 import { RollbackQuantityProduct } from '../utils/order.util';
+import Voucher from '../models/voucher.model';
 
 function calculateTotalPrice(items) {
   return items.reduce((total, item) => {
     return total + item.quantity * item.price;
   }, 0);
 }
+
+const applyVoucher = (voucher, totalPrice) => {
+  if (voucher.discountType === 'percentage') {
+    return totalPrice - (totalPrice * voucher.discountPercentage) / 100;
+  }
+
+  if (voucher.discountType === 'amount') {
+    return Math.max(0, totalPrice - voucher.discountAmount);
+  }
+
+  return totalPrice; // Nếu không áp dụng voucher
+};
 
 function getLastName(fullName) {
   if (!fullName) return ''; // Trường hợp chuỗi rỗng hoặc undefined
@@ -63,10 +76,11 @@ export const createOrder = catchAsync(async (req, res, next) => {
       phoneNumber,
       address,
       paymentMethod,
-      discountCode,
       discountVoucher,
+      discountCode,
       shippingCost,
     } = bodyData;
+    console.log(discountCode);
 
     // Kiểm tra thông tin địa chỉ
     const { error } = checkAddressOrderSchema.validate(
@@ -79,8 +93,26 @@ export const createOrder = catchAsync(async (req, res, next) => {
       return res.status(StatusCodes.BAD_REQUEST).json({ messages });
     }
 
-    // Tính tổng giá trị đơn hàng
-    const totalPrice = calculateTotalPrice(orderItems);
+    // Tính tổng giá trị đơn hàng ban đầu
+    let totalPrice = calculateTotalPrice(orderItems);
+
+    // Nếu có voucher, áp dụng giảm giá
+    if (discountCode) {
+      const voucher = await Voucher.findOne({ code: discountCode });
+
+      // if (voucher.userIds.includes(userId)) {
+      //   return next(
+      //     new AppError(
+      //       'Bạn đã sử dụng voucher này rồi',
+      //       StatusCodes.BAD_REQUEST
+      //     )
+      //   );
+      // }
+      await Voucher.findOneAndUpdate(
+        { code: discountCode },
+        { $push: { userIds: userId }, $inc: { usedCount: 1, quantity: -1 } }
+      );
+    }
 
     // Tạo mã đơn hàng
     const code = `FS${dayjs().format('YYYYMMDDHHmmss')}`;
@@ -97,8 +129,8 @@ export const createOrder = catchAsync(async (req, res, next) => {
       phoneNumber,
       address,
       paymentMethod,
-      discountCode,
       shippingCost,
+      discountCode,
       discountVoucher,
     });
     await order.save({ session });
@@ -119,7 +151,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
       const urlPayment = createPaymentUrl(
         req,
         totalPrice,
-        code,
+        order.id,
         `Thanh toán đơn hàng ${code}`
       );
 
@@ -152,6 +184,8 @@ export const createOrder = catchAsync(async (req, res, next) => {
     });
   }
 });
+
+// Hàm áp dụng voucher
 
 export const getAllOrderByUserId = catchAsync(async (req, res, next) => {
   const idUser = req.user.id;
@@ -256,6 +290,9 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
   const historyTransaction = await HistoryTransaction.findOne({
     idBill: orderId,
   });
+
+  console.log(historyTransaction);
+
   const formattedHistoryTransaction = {
     totalPrice: historyTransaction.totalMoney,
     type: historyTransaction.type,

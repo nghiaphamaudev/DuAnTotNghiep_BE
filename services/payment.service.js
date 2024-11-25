@@ -2,11 +2,13 @@ import crypto from 'crypto';
 import dotenv from 'dotenv';
 import dateFormat from 'dayjs';
 import dayjs from 'dayjs';
-import HistoryBill from '../models/historyBill.model';
+
 import querystring from 'qs';
 import config from 'config';
 import Order from '../models/order.model';
 import { StatusCodes } from 'http-status-codes';
+import HistoryTransaction from '../models/historyTransaction.model';
+import Voucher from '../models/voucher.model';
 
 dotenv.config();
 
@@ -88,7 +90,7 @@ export const createPaymentUrl = (req, amount, orderId, orderDescription) => {
 export const processVnpayPaymentResponse = async (req, res, next) => {
   var vnp_Params = req.query;
   var secureHash = vnp_Params['vnp_SecureHash'];
-  connsole.log(vnp_Params['vnp_TxnRef']);
+
   delete vnp_Params['vnp_SecureHash'];
   delete vnp_Params['vnp_SecureHashType'];
 
@@ -97,7 +99,6 @@ export const processVnpayPaymentResponse = async (req, res, next) => {
   var signData = querystring.stringify(vnp_Params, { encode: false });
   var hmac = crypto.createHmac('sha512', secretKey);
   var signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
-  console.log({ secureHash, signed });
 
   if (secureHash === signed) {
     var orderId = vnp_Params['vnp_TxnRef'];
@@ -111,10 +112,6 @@ export const processVnpayPaymentResponse = async (req, res, next) => {
       );
     } else {
       // Giao dịch thất bại
-      await Order.findOneAndUpdate(
-        { code: orderId },
-        { statusPayment: 'Thanh toán thất bại' }
-      );
     }
 
     res.status(200).json({ RspCode: '00', Message: 'success' });
@@ -127,14 +124,13 @@ export const processVnpayPaymentResponse = async (req, res, next) => {
 
 export const paymentRedirect = async (req, res, next) => {
   var vnp_Params = req.query;
-
   var secureHash = vnp_Params['vnp_SecureHash'];
 
   delete vnp_Params['vnp_SecureHash'];
   delete vnp_Params['vnp_SecureHashType'];
 
   vnp_Params = sortObject(vnp_Params);
-  console.log(vnp_Params['vnp_TxnRef']);
+
   var tmnCode = vnp_TmnCode;
   var secretKey = vnp_HashSecret;
 
@@ -149,16 +145,34 @@ export const paymentRedirect = async (req, res, next) => {
         statusPayment: 'Đã thanh tóan',
       }
     );
+    const historyTransaction = new HistoryTransaction({
+      idUser: req.user.id,
+      idBill: vnp_Params['vnp_TxnRef'],
+      type: 'Chuyển khoản',
+      totalMoney: vnp_Params['vnp_Amount'],
+      note: '',
+      status: true,
+    });
+    await historyTransaction.save();
   } else {
-    await Order.updateOne(
-      { code: vnp_Params['vnp_TxnRef'] },
-      { status: 'Đã bị hủy' }
+    const updatedOrder = await Order.updateOne(
+      { _id: vnp_Params['vnp_TxnRef'] },
+      { status: 'Đã hủy' }
     );
-    // await HistoryBill.updateOne({
-    //   code: vnp_Params['vnp_TxnRef'],
-    // }, {
+    console.log(updatedOrder);
 
-    // });
+    if (updatedOrder.discountCode) {
+      const voucher = await Voucher.findOne({
+        code: updatedOrder.discountCode,
+      });
+      console.log(voucher);
+
+      if (voucher) {
+        voucher.usedCount -= 1;
+        voucher.quantity += 1; // Giảm số lượng đã sử dụng
+        await voucher.save();
+      }
+    }
   }
   res.status(StatusCodes.OK).json({
     status: true,
