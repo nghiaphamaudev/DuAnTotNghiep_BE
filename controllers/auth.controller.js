@@ -179,7 +179,6 @@ export const restrictTo = (...roles) => {
 export const forgotPassword = catchAsync(async (req, res, next) => {
   //1) Get User based on posted email
   const { email } = req.body;
-
   //Validate từ form
   const { error } = forgotPasswordSchema.validate(
     { email },
