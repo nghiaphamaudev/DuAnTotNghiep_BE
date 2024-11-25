@@ -352,13 +352,19 @@ export const getAllUser = catchAsync(async (req, res, next) => {
   const limit = 6; // Số bản ghi trên mỗi trang
   const skip = (page - 1) * limit;
 
-  // Tìm tất cả người dùng ngoại trừ user hiện tại với giới hạn và phân trang
-  const users = await User.find({ _id: { $ne: currentUserId } })
+  // Tìm tất cả người dùng ngoại trừ user hiện tại và có role là admin
+  const users = await User.find({
+    _id: { $ne: currentUserId },
+    role: { $ne: 'admin' },
+  })
     .skip(skip)
     .limit(limit);
 
-  // Đếm tổng số người dùng (ngoại trừ user hiện tại) để tính tổng số trang
-  const totalUsers = await User.countDocuments({ _id: { $ne: currentUserId } });
+  // Đếm tổng số người dùng (ngoại trừ user hiện tại và admin) để tính tổng số trang
+  const totalUsers = await User.countDocuments({
+    _id: { $ne: currentUserId },
+    role: { $ne: 'admin' },
+  });
   const totalPages = Math.ceil(totalUsers / limit);
 
   res.status(200).json({
