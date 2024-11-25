@@ -10,6 +10,10 @@ const categorySchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    imageCategory: {
+      type: String,
+      required: true,
+    },
   },
   {
     toJSON: {
