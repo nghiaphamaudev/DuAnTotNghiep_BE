@@ -13,7 +13,10 @@ import AppError from '../utils/appError.util';
 import { checkAddressOrderSchema } from '../validator/user.validator';
 import { uploadProductImages } from '../middlewares/uploadCloud.middleware';
 import { createPaymentUrl } from '../services/payment.service';
-import { sendMailServiceConfirmOrder } from '../services/email.service';
+import {
+  sendMailDelivered,
+  sendMailServiceConfirmOrder,
+} from '../services/email.service';
 import { RollbackQuantityProduct } from '../utils/order.util';
 import Voucher from '../models/voucher.model';
 
@@ -318,7 +321,6 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
 
 export const updateStatusOrder = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
-  const nameUser = getLastName(currentUser.fullName);
   const { idOrder, status, statusShip } = req.body;
 
   const id = new mongoose.Types.ObjectId(idOrder);
@@ -349,6 +351,12 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
       );
     }
   }
+  if (status === 'Đã giao hàng') {
+    sendMailDelivered(
+      'phamnghia19022002@gmail.com',
+      'Đơn hàng đã được giao thành công!'
+    );
+  }
   updateOrder = await Order.findByIdAndUpdate(
     id,
     { $set: { status, statusShip } },
@@ -361,9 +369,11 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
   const orderDetails = await Promise.all(
     updateOrder.orderItems.map(async (item) => {
       const product = item.productId;
+      console.log(product);
       const variant = product.variants.find(
         (v) => v._id.toString() === item.variantId
       );
+      console.log(variant);
       const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
 
       return {

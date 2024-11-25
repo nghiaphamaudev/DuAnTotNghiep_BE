@@ -187,3 +187,140 @@ export const sendMaiBlockedOrder = async (to, subject, nameUser, note) => {
     throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
   }
 };
+
+export const sendMailDelivered = async (to, subject) => {
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USERNAME, // địa chỉ email người gửi
+      to: to, // địa chỉ email người nhận
+      subject: subject, // tiêu đề email // nội dung email
+      html: `
+          <!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+      color: #333;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 20px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    .email-header {
+      background-color: #007bff;
+      color: #ffffff;
+      text-align: center;
+      padding: 20px;
+    }
+    .email-header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .email-body {
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .email-body h2 {
+      font-size: 20px;
+      color: #007bff;
+    }
+    .order-details {
+      margin: 20px 0;
+      border-collapse: collapse;
+      width: 100%;
+    }
+    .order-details th, .order-details td {
+      text-align: left;
+      padding: 8px;
+      border: 1px solid #ddd;
+    }
+    .order-details th {
+      background-color: #f8f9fa;
+      color: #333;
+    }
+    .email-footer {
+      background-color: #f8f9fa;
+      text-align: center;
+      padding: 15px;
+      font-size: 14px;
+      color: #666;
+    }
+    .email-footer a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    .btn {
+      display: inline-block;
+      background-color: #007bff;
+      color: #ffffff;
+      text-decoration: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    .btn:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <h1>Xác nhận đơn hàng đã giao</h1>
+    </div>
+    <div class="email-body">
+      <p>Xin chào <strong>[Tên khách hàng]</strong>,</p>
+      <p>Chúng tôi rất vui thông báo rằng đơn hàng của bạn đã được giao thành công.</p>
+      <h2>Chi tiết đơn hàng</h2>
+      <table class="order-details">
+        <tr>
+          <th>Mã đơn hàng</th>
+          <td>[Mã đơn hàng]</td>
+        </tr>
+        <tr>
+          <th>Ngày đặt hàng</th>
+          <td>[Ngày đặt]</td>
+        </tr>
+        <tr>
+          <th>Phương thức thanh toán</th>
+          <td>[Phương thức thanh toán]</td>
+        </tr>
+        <tr>
+          <th>Tổng tiền</th>
+          <td>[Tổng tiền]</td>
+        </tr>
+      </table>
+      <p>Nếu bạn có bất kỳ câu hỏi nào hoặc cần hỗ trợ, vui lòng liên hệ với chúng tôi qua email hoặc hotline.</p>
+      <p>
+        <a href="[Đường dẫn đến trang đánh giá]" class="btn">Đánh giá sản phẩm</a>
+      </p>
+    </div>
+    <div class="email-footer">
+      <p>Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ của chúng tôi.</p>
+      <p>Hotline: <a href="tel:+84123456789">+84 123 456 789</a></p>
+      <p><a href="[Link website]" target="_blank">[Tên công ty]</a></p>
+    </div>
+  </div>
+</body>
+</html>
+
+        `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email đã được gửi:', info.response);
+  } catch (error) {
+    console.error('Lỗi khi gửi email:', error);
+    throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
+  }
+};

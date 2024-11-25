@@ -126,7 +126,8 @@ export const getCartDetails = catchAsync(async (req, res, next) => {
         sizeId: size._id,
         statusProduct: product.status, // Trạng thái sản phẩm
         statusVariant: variant.status, // Trạng thái hết hàng của biến thể
-        statusSize: size.status, // Trạng thái hết hàng của size
+        statusSize: size.status,
+        inventory: size.inventory,
       };
     })
   );
