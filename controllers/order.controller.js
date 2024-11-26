@@ -17,7 +17,10 @@ import {
   sendMailDelivered,
   sendMailServiceConfirmOrder,
 } from '../services/email.service';
-import { RollbackQuantityProduct } from '../utils/order.util';
+import {
+  RollbackInventoryOnCancel,
+  RollbackQuantityProduct,
+} from '../utils/order.util';
 import Voucher from '../models/voucher.model';
 
 function calculateTotalPrice(items) {
@@ -83,9 +86,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
       discountCode,
       shippingCost,
     } = bodyData;
-    console.log(discountCode);
 
-    // Kiểm tra thông tin địa chỉ
     const { error } = checkAddressOrderSchema.validate(
       { receiver, phoneNumber, address },
       { abortEarly: false }
@@ -96,10 +97,8 @@ export const createOrder = catchAsync(async (req, res, next) => {
       return res.status(StatusCodes.BAD_REQUEST).json({ messages });
     }
 
-    // Tính tổng giá trị đơn hàng ban đầu
     let totalPrice = calculateTotalPrice(orderItems);
 
-    // Nếu có voucher, áp dụng giảm giá
     if (discountCode) {
       const voucher = await Voucher.findOne({ code: discountCode });
 
@@ -117,12 +116,11 @@ export const createOrder = catchAsync(async (req, res, next) => {
       );
     }
 
-    // Tạo mã đơn hàng
     const code = `FS${dayjs().format('YYYYMMDDHHmmss')}`;
 
-    RollbackQuantityProduct(orderItems, next);
+    // Gọi RollbackQuantityProduct và đảm bảo sẽ dừng quá trình nếu có lỗi
+    await RollbackQuantityProduct(orderItems, next);
 
-    // Tạo đơn hàng
     const order = new Order({
       userId,
       code,
@@ -138,7 +136,6 @@ export const createOrder = catchAsync(async (req, res, next) => {
     });
     await order.save({ session });
 
-    // Tạo lịch sử hóa đơn
     const historyBill = new HistoryBill({
       userId: userId,
       idBill: order.id,
@@ -149,7 +146,6 @@ export const createOrder = catchAsync(async (req, res, next) => {
     });
     await historyBill.save({ session });
 
-    // Nếu thanh toán qua VNPAY, trả URL thanh toán
     if (paymentMethod === 'VNPAY') {
       const urlPayment = createPaymentUrl(
         req,
@@ -168,10 +164,9 @@ export const createOrder = catchAsync(async (req, res, next) => {
       });
     }
 
-    // Cập nhật giỏ hàng sau khi tạo đơn hàng
     await updateCartAfterOrder(userId, orderItems);
 
-    await session.commitTransaction(); // Commit transaction
+    await session.commitTransaction();
     session.endSession();
 
     return res.status(200).json({
@@ -179,7 +174,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
       data: order,
     });
   } catch (error) {
-    await session.abortTransaction(); // Rollback nếu có lỗi
+    await session.abortTransaction();
     session.endSession();
     return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       status: false,
@@ -227,11 +222,14 @@ export const getAllOrderByUserId = catchAsync(async (req, res, next) => {
 
 export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
   const orderId = new mongoose.Types.ObjectId(req.params.orderId);
+
   // Tìm đơn hàng theo ID và populate các thông tin cần thiết
   const order = await Order.findById(orderId).populate({
     path: 'orderItems.productId',
-    select: 'name coverImg variants ',
+    select: 'name coverImg variants',
   });
+
+  console.log(order);
 
   // Kiểm tra nếu không tìm thấy đơn hàng
   if (!order) return next(new AppError('Không tìm thấy đơn hàng.', 404));
@@ -240,17 +238,33 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
   const orderDetails = await Promise.all(
     order.orderItems.map(async (item) => {
       const product = item.productId;
+
+      if (!product) {
+        throw new AppError('Sản phẩm không tồn tại trong đơn hàng.', 404);
+      }
+
+      // Tìm variant và size
       const variant = product.variants.find(
-        (v) => v._id.toString() === item.variantId
+        (v) => v._id.toString() === item.variantId.toString()
       );
+
+      // Kiểm tra nếu không tìm thấy variant
+      if (!variant) {
+        throw new AppError('Không tìm thấy variant cho sản phẩm.', 404);
+      }
       const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
+
+      // Kiểm tra nếu không tìm thấy size
+      if (!size) {
+        throw new AppError('Không tìm thấy size cho variant.', 404);
+      }
 
       return {
         id: item._id,
         productId: product._id,
         name: product.name,
         color: variant.color,
-        image: variant.images[0],
+        image: variant.images[0], // Bạn có thể thay đổi cách hiển thị ảnh nếu cần
         size: size.nameSize,
         price: size.price,
         quantity: item.quantity,
@@ -259,14 +273,15 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     })
   );
 
-  // Tính tổng giá tiền cho đơn hàng (có thể đã được lưu nhưng tính lại để đảm bảo)
+  // Tính tổng giá tiền cho đơn hàng
   const totalOrderPrice = orderDetails.reduce(
     (acc, item) => acc + item.totalItemPrice,
     0
   );
 
-  //trả lại lịch sử đơn hàng
+  // Trả lại lịch sử đơn hàng
   const historyBills = await HistoryBill.find({ idBill: orderId });
+
   const formattedHistoryBills = historyBills.map((bill) => ({
     createdAt: format(new Date(bill.createdAt), 'dd/MM/yyyy HH:mm:ss'),
     creator: bill.creator,
@@ -275,8 +290,7 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     note: bill.note,
   }));
 
-  // trả lại thông tin đơn hàng
-
+  // Trả lại thông tin đơn hàng
   const orderInfor = {
     orderId: order._id,
     code: order.code,
@@ -288,28 +302,30 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     receiver: order.receiver,
   };
 
-  // trả lại lịch sử thanh toán
-
+  // Trả lại lịch sử thanh toán
   const historyTransaction = await HistoryTransaction.findOne({
     idBill: orderId,
   });
 
-  console.log(historyTransaction);
+  // Kiểm tra nếu không tìm thấy lịch sử thanh toán
 
-  const formattedHistoryTransaction = {
-    totalPrice: historyTransaction.totalMoney,
-    type: historyTransaction.type,
-    createdAt: format(
-      new Date(historyTransaction.createdAt),
-      'dd/MM/yyyy HH:mm:ss'
-    ),
-  };
+  const formattedHistoryTransaction = historyTransaction
+    ? {
+        totalPrice: historyTransaction.totalMoney,
+        type: historyTransaction.type,
+        createdAt: format(
+          new Date(historyTransaction.createdAt),
+          'dd/MM/yyyy HH:mm:ss'
+        ),
+      }
+    : null;
 
+  // Trả lại kết quả
   res.status(200).json({
     status: true,
     message: 'Lấy thành công.',
     data: {
-      orderInfor: orderInfor,
+      orderInfor,
       totalOrderPrice, // Tổng giá tiền của đơn hàng
       createdAt: format(new Date(order.createdAt), 'dd/MM/yyyy HH:mm:ss'),
       orderItems: orderDetails,
@@ -320,7 +336,6 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
 });
 
 export const updateStatusOrder = catchAsync(async (req, res, next) => {
-  const currentUser = req.user;
   const { idOrder, status, statusShip } = req.body;
 
   const id = new mongoose.Types.ObjectId(idOrder);
@@ -338,10 +353,17 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     );
   }
 
+  if (status === 'Đã giao hàng') {
+    sendMailDelivered(
+      'phamnghia19022002@gmail.com',
+      'Đơn hàng đã được giao thành công!'
+    );
+  }
+
   if (status === 'Đã hủy' || status === 'Hoàn đơn') {
     try {
       // Rollback số lượng sản phẩm trong kho
-      await RollbackQuantityProduct(updateOrder.orderItems, next, true);
+      await RollbackInventoryOnCancel(updateOrder.orderItems, next);
     } catch (error) {
       return next(
         new AppError(
@@ -351,12 +373,6 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
       );
     }
   }
-  if (status === 'Đã giao hàng') {
-    sendMailDelivered(
-      'phamnghia19022002@gmail.com',
-      'Đơn hàng đã được giao thành công!'
-    );
-  }
   updateOrder = await Order.findByIdAndUpdate(
     id,
     { $set: { status, statusShip } },
@@ -365,15 +381,14 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     path: 'orderItems.productId',
     select: 'name coverImg variants',
   });
-
   const orderDetails = await Promise.all(
     updateOrder.orderItems.map(async (item) => {
       const product = item.productId;
-      console.log(product);
+
       const variant = product.variants.find(
         (v) => v._id.toString() === item.variantId
       );
-      console.log(variant);
+
       const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
 
       return {
