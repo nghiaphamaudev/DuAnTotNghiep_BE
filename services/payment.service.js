@@ -159,13 +159,11 @@ export const paymentRedirect = async (req, res, next) => {
       { _id: vnp_Params['vnp_TxnRef'] },
       { status: 'Đã hủy' }
     );
-    console.log(updatedOrder);
 
     if (updatedOrder.discountCode) {
       const voucher = await Voucher.findOne({
         code: updatedOrder.discountCode,
       });
-      console.log(voucher);
 
       if (voucher) {
         voucher.usedCount -= 1;
