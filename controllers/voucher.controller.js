@@ -12,7 +12,19 @@ export const addVoucher = catchAsync(async (req, res, next) => {
   }
 
   const newVoucher = new Voucher(req.body);
-  await newVoucher.save();
+  try {
+    await newVoucher.save();
+  } catch (error) {
+    if (error.code === 11000) {
+      // Xử lý lỗi trùng lặp
+      return next(
+        new AppError(
+          `Voucher với mã '${req.body.code}' đã tồn tại. Vui lòng chọn mã khác.`,
+          StatusCodes.CONFLICT // HTTP 409
+        )
+      );
+    }
+  }
   res.status(StatusCodes.CREATED).json({
     status: true,
     message: 'Voucher tạo thành công',
@@ -23,7 +35,6 @@ export const addVoucher = catchAsync(async (req, res, next) => {
 export const updateVoucher = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const updateData = req.body;
-  console.log(req.body);
 
   const updatedVoucher = await Voucher.findByIdAndUpdate(id, updateData, {
     new: true,

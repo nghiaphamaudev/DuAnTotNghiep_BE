@@ -44,11 +44,13 @@ export const sendMailServiceForgotPassword = async (to, subject, link) => {
   }
 };
 export const sendMailServiceConfirmOrder = async (
-  nameUser,
   orderId,
   orderDate,
   totalPrice,
   products,
+  totalCost,
+  discountVoucher,
+  shippingCost,
   to,
   title,
   receiver,
@@ -56,7 +58,6 @@ export const sendMailServiceConfirmOrder = async (
   address
 ) => {
   try {
-    console.log(products);
     const mailOptions = {
       from: process.env.EMAIL_USERNAME, // địa chỉ email người gửi
       to: to, // địa chỉ email người nhận
@@ -73,6 +74,9 @@ export const sendMailServiceConfirmOrder = async (
         orderDate,
         totalPrice,
         products,
+        totalCost,
+        discountVoucher,
+        shippingCost,
         receiver,
         phoneNumber,
         address
@@ -188,11 +192,18 @@ export const sendMaiBlockedOrder = async (to, subject, nameUser, note) => {
   }
 };
 
-export const sendMailDelivered = async (to, subject) => {
+export const sendMailDelivered = async (
+  user,
+  subject,
+  orderCode,
+  orderDate,
+  paymentMethod,
+  totalOrderPrice
+) => {
   try {
     const mailOptions = {
       from: process.env.EMAIL_USERNAME, // địa chỉ email người gửi
-      to: to, // địa chỉ email người nhận
+      to: user.email, // địa chỉ email người nhận
       subject: subject, // tiêu đề email // nội dung email
       html: `
           <!DOCTYPE html>
@@ -279,25 +290,25 @@ export const sendMailDelivered = async (to, subject) => {
       <h1>Xác nhận đơn hàng đã giao</h1>
     </div>
     <div class="email-body">
-      <p>Xin chào <strong>[Tên khách hàng]</strong>,</p>
+      <p>Xin chào <strong>${user.fullName}</strong>,</p>
       <p>Chúng tôi rất vui thông báo rằng đơn hàng của bạn đã được giao thành công.</p>
       <h2>Chi tiết đơn hàng</h2>
       <table class="order-details">
         <tr>
           <th>Mã đơn hàng</th>
-          <td>[Mã đơn hàng]</td>
+          <td>${orderCode}</td>
         </tr>
         <tr>
           <th>Ngày đặt hàng</th>
-          <td>[Ngày đặt]</td>
+          <td>${orderDate}</td>
         </tr>
         <tr>
           <th>Phương thức thanh toán</th>
-          <td>[Phương thức thanh toán]</td>
+          <td>${paymentMethod}</td>
         </tr>
         <tr>
           <th>Tổng tiền</th>
-          <td>[Tổng tiền]</td>
+          <td>${totalOrderPrice}</td>
         </tr>
       </table>
       <p>Nếu bạn có bất kỳ câu hỏi nào hoặc cần hỗ trợ, vui lòng liên hệ với chúng tôi qua email hoặc hotline.</p>

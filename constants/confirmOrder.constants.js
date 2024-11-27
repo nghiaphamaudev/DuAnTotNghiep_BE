@@ -71,6 +71,9 @@ export function templateConfirmOrder2(
   orderDate,
   totalPrice,
   products,
+  totalCost,
+  discountVoucher,
+  shippingCost,
   receiver,
   phoneNumber,
   address
@@ -2069,6 +2072,63 @@ export function templateConfirmOrder2(
                                                                                           >
                                                                                             <div>
                                                                                               <span
+                                                                                                >Số lượng
+                                                                                                :
+                                                                                                ${item.quantity}</span
+                                                                                              >
+                                                                                            </div>
+                                                                                          </div>
+                                                                                        </td>
+                                                                                      </tr>
+                                                                                    </table>
+                                                                                  </th>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                  <th
+                                                                                    align="left"
+                                                                                    valign="top"
+                                                                                    style="
+                                                                                      font-weight: normal;
+                                                                                      text-align: left;
+                                                                                    "
+                                                                                  >
+                                                                                    <table
+                                                                                      border="0"
+                                                                                      cellpadding="0"
+                                                                                      cellspacing="0"
+                                                                                      role="presentation"
+                                                                                      width="100%"
+                                                                                      style="
+                                                                                        border-collapse: separate;
+                                                                                        border-spacing: 0;
+                                                                                        margin-right: auto;
+                                                                                        margin-left: auto;
+                                                                                      "
+                                                                                    >
+                                                                                      <tr>
+                                                                                        <td
+                                                                                          valign="top"
+                                                                                          align="left"
+                                                                                        >
+                                                                                          <div
+                                                                                            class="pc-font-alt"
+                                                                                            style="
+                                                                                              line-height: 140%;
+                                                                                              letter-spacing: -0.2px;
+                                                                                              font-family: 'Hanken Grotesk',
+                                                                                                Arial,
+                                                                                                Helvetica,
+                                                                                                sans-serif;
+                                                                                              font-size: 14px;
+                                                                                              font-weight: normal;
+                                                                                              font-variant-ligatures: normal;
+                                                                                              color: #99959b;
+                                                                                              text-align: left;
+                                                                                              text-align-last: left;
+                                                                                            "
+                                                                                          >
+                                                                                            <div>
+                                                                                              <span
                                                                                                 >Size
                                                                                                 :
                                                                                                 ${item.size}</span
@@ -2417,7 +2477,224 @@ export function templateConfirmOrder2(
                                                                         >
                                                                           <div>
                                                                             <span
-                                                                              >60.000
+                                                                              >${totalPrice}
+                                                                              VNĐ</span
+                                                                            >
+                                                                          </div>
+                                                                        </div>
+                                                                      </td>
+                                                                    </tr>
+                                                                  </table>
+                                                                </th>
+                                                              </tr>
+                                                            </table>
+                                                          </td>
+                                                        </tr>
+                                                      </table>
+                                                    </td>
+                                                  </tr>
+                                                </table>
+                                              </td>
+                                            </tr>
+
+
+
+                                            <tr align="right" valign="middle">
+                                              <td
+                                                class="pc-w620-halign-right pc-w620-valign-middle"
+                                                align="right"
+                                                valign="middle"
+                                                style="padding: 4px 0px 4px 0px"
+                                              >
+                                                <table
+                                                  width="100%"
+                                                  border="0"
+                                                  cellpadding="0"
+                                                  cellspacing="0"
+                                                  role="presentation"
+                                                >
+                                                  <tr>
+                                                    <td>
+                                                      <table
+                                                        width="100%"
+                                                        border="0"
+                                                        cellpadding="0"
+                                                        cellspacing="0"
+                                                        role="presentation"
+                                                      >
+                                                        <tr>
+                                                          <td
+                                                            class="pc-w620-align-left"
+                                                            valign="top"
+                                                            align="left"
+                                                          >
+                                                            <table
+                                                              width="100%"
+                                                              border="0"
+                                                              cellpadding="0"
+                                                              cellspacing="0"
+                                                              role="presentation"
+                                                            >
+                                                              <tr>
+                                                                <th
+                                                                  class="pc-w620-spacing-0-0-0-0 pc-w620-align-left"
+                                                                  align="left"
+                                                                  valign="top"
+                                                                  style="
+                                                                    font-weight: normal;
+                                                                    text-align: left;
+                                                                    padding: 0px
+                                                                      0px 0px
+                                                                      0px;
+                                                                  "
+                                                                >
+                                                                  <table
+                                                                    border="0"
+                                                                    cellpadding="0"
+                                                                    cellspacing="0"
+                                                                    role="presentation"
+                                                                    class="pc-w620-align-left"
+                                                                    width="100%"
+                                                                    style="
+                                                                      border-collapse: separate;
+                                                                      border-spacing: 0;
+                                                                      margin-right: auto;
+                                                                      margin-left: auto;
+                                                                    "
+                                                                  >
+                                                                    <tr>
+                                                                      <td
+                                                                        valign="top"
+                                                                        class="pc-w620-padding-0-0-0-0 pc-w620-align-left"
+                                                                        align="left"
+                                                                        style="
+                                                                          padding: 0px
+                                                                            0px
+                                                                            0px
+                                                                            0px;
+                                                                        "
+                                                                      >
+                                                                        <div
+                                                                          class="pc-font-alt pc-w620-align-left pc-w620-fontSize-14px pc-w620-lineHeight-140pc"
+                                                                          style="
+                                                                            line-height: 140%;
+                                                                            letter-spacing: -0.3px;
+                                                                            font-family: 'Hanken Grotesk',
+                                                                              Arial,
+                                                                              Helvetica,
+                                                                              sans-serif;
+                                                                            font-size: 14px;
+                                                                            font-weight: normal;
+                                                                            font-variant-ligatures: normal;
+                                                                            color: #27142d;
+                                                                            text-align: left;
+                                                                            text-align-last: left;
+                                                                          "
+                                                                        >
+                                                                          <div>
+                                                                            <span
+                                                                              >Giảm giá</span
+                                                                            >
+                                                                          </div>
+                                                                        </div>
+                                                                      </td>
+                                                                    </tr>
+                                                                  </table>
+                                                                </th>
+                                                              </tr>
+                                                            </table>
+                                                          </td>
+                                                        </tr>
+                                                      </table>
+                                                    </td>
+                                                  </tr>
+                                                </table>
+                                              </td>
+                                              <td
+                                                class="pc-w620-halign-right pc-w620-valign-middle"
+                                                align="right"
+                                                valign="middle"
+                                                style="padding: 4px 0px 4px 0px"
+                                              >
+                                                <table
+                                                  width="100%"
+                                                  border="0"
+                                                  cellpadding="0"
+                                                  cellspacing="0"
+                                                  role="presentation"
+                                                >
+                                                  <tr>
+                                                    <td>
+                                                      <table
+                                                        width="100%"
+                                                        border="0"
+                                                        cellpadding="0"
+                                                        cellspacing="0"
+                                                        role="presentation"
+                                                      >
+                                                        <tr>
+                                                          <td
+                                                            class="pc-w620-align-right"
+                                                            valign="top"
+                                                            align="right"
+                                                          >
+                                                            <table
+                                                              width="100%"
+                                                              border="0"
+                                                              cellpadding="0"
+                                                              cellspacing="0"
+                                                              role="presentation"
+                                                            >
+                                                              <tr>
+                                                                <th
+                                                                  class="pc-w620-spacing-0-0-0-0 pc-w620-align-right"
+                                                                  align="right"
+                                                                  valign="top"
+                                                                  style="
+                                                                    font-weight: normal;
+                                                                    text-align: left;
+                                                                  "
+                                                                >
+                                                                  <table
+                                                                    border="0"
+                                                                    cellpadding="0"
+                                                                    cellspacing="0"
+                                                                    role="presentation"
+                                                                    class="pc-w620-align-right"
+                                                                    width="100%"
+                                                                    style="
+                                                                      border-collapse: separate;
+                                                                      border-spacing: 0;
+                                                                      margin-right: auto;
+                                                                      margin-left: auto;
+                                                                    "
+                                                                  >
+                                                                    <tr>
+                                                                      <td
+                                                                        valign="top"
+                                                                        class="pc-w620-padding-0-0-0-0 pc-w620-align-right"
+                                                                        align="right"
+                                                                      >
+                                                                        <div
+                                                                          class="pc-font-alt pc-w620-align-right"
+                                                                          style="
+                                                                            line-height: 140%;
+                                                                            letter-spacing: -0.2px;
+                                                                            font-family: 'Hanken Grotesk',
+                                                                              Arial,
+                                                                              Helvetica,
+                                                                              sans-serif;
+                                                                            font-size: 14px;
+                                                                            font-weight: normal;
+                                                                            font-variant-ligatures: normal;
+                                                                            color: #53335d;
+                                                                            text-align: right;
+                                                                            text-align-last: right;
+                                                                          "
+                                                                        >
+                                                                          <div>
+                                                                            <span
+                                                                              >-${discountVoucher}
                                                                               VNĐ</span
                                                                             >
                                                                           </div>
@@ -2530,8 +2807,7 @@ export function templateConfirmOrder2(
                                                                         >
                                                                           <div>
                                                                             <span
-                                                                              >20%
-                                                                              Off</span
+                                                                              >Vận chuyển</span
                                                                             >
                                                                           </div>
                                                                         </div>
@@ -2632,7 +2908,7 @@ export function templateConfirmOrder2(
                                                                         >
                                                                           <div>
                                                                             <span
-                                                                              >12.000
+                                                                              >+${shippingCost}
                                                                               VNĐ</span
                                                                             >
                                                                           </div>
@@ -2651,6 +2927,10 @@ export function templateConfirmOrder2(
                                                 </table>
                                               </td>
                                             </tr>
+
+
+
+
                                             <tr align="right" valign="middle">
                                               <td
                                                 class="pc-w620-halign-right pc-w620-valign-middle"
@@ -2847,7 +3127,7 @@ export function templateConfirmOrder2(
                                                                         >
                                                                           <div>
                                                                             <span
-                                                                              >48.000
+                                                                              >${totalCost}
                                                                               VNĐ</span
                                                                             >
                                                                           </div>

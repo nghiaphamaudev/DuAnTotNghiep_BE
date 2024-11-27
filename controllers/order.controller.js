@@ -11,7 +11,6 @@ import catchAsync from '../utils/catchAsync.util';
 import mongoose from 'mongoose';
 import AppError from '../utils/appError.util';
 import { checkAddressOrderSchema } from '../validator/user.validator';
-import { uploadProductImages } from '../middlewares/uploadCloud.middleware';
 import { createPaymentUrl } from '../services/payment.service';
 import {
   sendMailDelivered,
@@ -101,15 +100,21 @@ export const createOrder = catchAsync(async (req, res, next) => {
 
     if (discountCode) {
       const voucher = await Voucher.findOne({ code: discountCode });
-
-      if (voucher.userIds.includes(userId)) {
+      if (voucher) {
+        if (voucher.userIds.includes(userId)) {
+          return next(
+            new AppError(
+              'Bạn đã sử dụng voucher này rồi',
+              StatusCodes.BAD_REQUEST
+            )
+          );
+        }
+      } else {
         return next(
-          new AppError(
-            'Bạn đã sử dụng voucher này rồi',
-            StatusCodes.BAD_REQUEST
-          )
+          new AppError('Voucher này không tồn tại', StatusCodes.BAD_REQUEST)
         );
       }
+
       await Voucher.findOneAndUpdate(
         { code: discountCode },
         { $push: { userIds: userId }, $inc: { usedCount: 1, quantity: -1 } }
@@ -170,6 +175,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
     session.endSession();
 
     return res.status(200).json({
+      status: true,
       message: 'Thành công',
       data: order,
     });
@@ -229,8 +235,6 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     select: 'name coverImg variants',
   });
 
-  console.log(order);
-
   // Kiểm tra nếu không tìm thấy đơn hàng
   if (!order) return next(new AppError('Không tìm thấy đơn hàng.', 404));
 
@@ -274,10 +278,6 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
   );
 
   // Tính tổng giá tiền cho đơn hàng
-  const totalOrderPrice = orderDetails.reduce(
-    (acc, item) => acc + item.totalItemPrice,
-    0
-  );
 
   // Trả lại lịch sử đơn hàng
   const historyBills = await HistoryBill.find({ idBill: orderId });
@@ -326,7 +326,10 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     message: 'Lấy thành công.',
     data: {
       orderInfor,
-      totalOrderPrice, // Tổng giá tiền của đơn hàng
+      totalPrice: order.totalPrice,
+      shippingCost: order.shippingCost,
+      discountVoucher: order.discountVoucher,
+      totalCost: order.totalCost, // Tổng giá tiền của đơn hàng
       createdAt: format(new Date(order.createdAt), 'dd/MM/yyyy HH:mm:ss'),
       orderItems: orderDetails,
       historyBill: formattedHistoryBills,
@@ -353,15 +356,10 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     );
   }
 
-  if (status === 'Đã giao hàng') {
-    sendMailDelivered(
-      'phamnghia19022002@gmail.com',
-      'Đơn hàng đã được giao thành công!'
-    );
-  }
-
   if (status === 'Đã hủy' || status === 'Hoàn đơn') {
     try {
+      updateOrder.status = status;
+      await updateOrder.save();
       // Rollback số lượng sản phẩm trong kho
       await RollbackInventoryOnCancel(updateOrder.orderItems, next);
     } catch (error) {
@@ -373,14 +371,46 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
       );
     }
   }
+
   updateOrder = await Order.findByIdAndUpdate(
     id,
     { $set: { status, statusShip } },
     { new: true }
-  ).populate({
-    path: 'orderItems.productId',
-    select: 'name coverImg variants',
-  });
+  )
+    .populate({
+      path: 'orderItems.productId',
+      select: 'name coverImg variants',
+    })
+    .populate({
+      path: 'userId',
+      select: 'email fullName', // Các trường cần lấy từ user
+    });
+
+  const orderDate = format(
+    new Date(updateOrder.createdAt),
+    'dd/MM/yyyy HH:mm:ss'
+  );
+
+  console.log(updateOrder);
+
+  if (status === 'Đã giao hàng') {
+    updateOrder.status = status;
+    await updateOrder.save();
+    const user = {
+      email: updateOrder.userId.email,
+      fullName: updateOrder.userId.fullName,
+    };
+
+    await sendMailDelivered(
+      user,
+      'Đơn hàng đã được giao thành công!',
+      updateOrder.code,
+      orderDate,
+      updateOrder.paymentMethod,
+      updateOrder.totalPrice
+    );
+  }
+
   const orderDetails = await Promise.all(
     updateOrder.orderItems.map(async (item) => {
       const product = item.productId;
@@ -405,19 +435,42 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     })
   );
 
+  if (status === 'Đã xác nhận') {
+    const title = `Xác Nhận Đơn Hàng #${updateOrder.code} - Cảm ơn bạn đã mua sắm tại FShirt`;
+
+    await updateOrder.save();
+    updateOrder.save();
+    await sendMailServiceConfirmOrder(
+      updateOrder.code,
+      orderDate,
+      updateOrder.totalPrice,
+      orderDetails,
+      updateOrder.totalCost,
+      updateOrder.discountVoucher,
+      updateOrder.shippingCost,
+      req.user.email,
+      title,
+      updateOrder.receiver,
+      updateOrder.phoneNumber,
+      updateOrder.address
+    );
+  }
+
   const totalOrderPrice = orderDetails.reduce(
     (acc, item) => acc + item.totalItemPrice,
     0
   );
 
-  if (status === 'Hoàn thành') {
+  if (status === 'Đã nhận được hàng') {
     const historyTransaction = new HistoryTransaction({
       idUser: req.user.id,
       idBill: id,
-      totalMoney: totalOrderPrice,
+      totalMoney: updateOrder.totalCost,
       note: '',
       status: true,
     });
+    updateOrder.status = status;
+    await updateOrder.save();
     await historyTransaction.save();
   }
 
@@ -433,14 +486,14 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: true,
-    message: 'Lấy chi tiết đơn hàng thành công.',
-    data: {
-      orderId: updateOrder._id,
-      code: updateOrder.code,
-      totalOrderPrice, // Tổng giá tiền của đơn hàng
-      createdAt: format(new Date(updateOrder.createdAt), 'dd/MM/yyyy HH:mm:ss'),
-      status: updateOrder.status,
-      orderItems: orderDetails,
-    },
+    message: 'Cập nhật đơn hàng thành công.',
+    // data: {
+    //   orderId: updateOrder._id,
+    //   code: updateOrder.code,
+    //   totalOrderPrice, // Tổng giá tiền của đơn hàng
+    //   createdAt: format(new Date(updateOrder.createdAt), 'dd/MM/yyyy HH:mm:ss'),
+    //   status: updateOrder.status,
+    //   orderItems: orderDetails,
+    // },
   });
 });
