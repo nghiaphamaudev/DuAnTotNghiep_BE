@@ -360,6 +360,7 @@ export const getAllUser = catchAsync(async (req, res, next) => {
   })
     .skip(skip)
     .limit(limit);
+  console.log(users);
 
   // Đếm tổng số người dùng (ngoại trừ user hiện tại và admin) để tính tổng số trang
   const totalUsers = await User.countDocuments({
