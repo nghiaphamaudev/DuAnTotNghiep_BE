@@ -1,3 +1,4 @@
+
 import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import slugify from 'slugify';
@@ -80,6 +81,7 @@ const productSchema = new mongoose.Schema(
     coverImg: { type: String, required: true },
     ratingAverage: { type: Number, default: 0 },
     variants: [variantSchema],
+    orderQuantity: { type: Number, default: 0 },
     ratingQuantity: { type: Number, default: 0 },
     description: { type: String, required: true },
     isActive: {
