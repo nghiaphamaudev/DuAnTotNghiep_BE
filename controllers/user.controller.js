@@ -360,7 +360,6 @@ export const getAllUser = catchAsync(async (req, res, next) => {
   })
     .skip(skip)
     .limit(limit);
-  console.log(users);
 
   // Đếm tổng số người dùng (ngoại trừ user hiện tại và admin) để tính tổng số trang
   const totalUsers = await User.countDocuments({
@@ -468,7 +467,6 @@ export const toggleBlockUserById = catchAsync(async (req, res, next) => {
   const { shouldBlock, note } = req.body;
 
   const user = await User.findById(userId);
-  console.log(user);
 
   if (!user) {
     return next(
@@ -477,9 +475,8 @@ export const toggleBlockUserById = catchAsync(async (req, res, next) => {
   }
 
   if (note && shouldBlock === false) {
-    console.log(shouldBlock);
     user.active = shouldBlock;
-
+    user.blockReason = note;
     try {
       await user.save();
     } catch (err) {
@@ -500,6 +497,7 @@ export const toggleBlockUserById = catchAsync(async (req, res, next) => {
     );
   } else {
     user.active = shouldBlock;
+    user.blockReason = '';
     await user.save();
   }
 

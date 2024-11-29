@@ -9,6 +9,7 @@ import Order from '../models/order.model';
 import { StatusCodes } from 'http-status-codes';
 import HistoryTransaction from '../models/historyTransaction.model';
 import Voucher from '../models/voucher.model';
+import { RollbackInventoryOnCancel } from '../utils/order.util';
 
 dotenv.config();
 
@@ -159,6 +160,9 @@ export const paymentRedirect = async (req, res, next) => {
       { _id: vnp_Params['vnp_TxnRef'] },
       { status: 'Đã hủy' }
     );
+    updatedOrder.status = status;
+    await updatedOrder.save();
+    await RollbackInventoryOnCancel(updatedOrder.orderItems);
 
     if (updatedOrder.discountCode) {
       const voucher = await Voucher.findOne({
