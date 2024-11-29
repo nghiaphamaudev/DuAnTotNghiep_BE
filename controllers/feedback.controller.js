@@ -1,7 +1,7 @@
 import Feedback from "../models/feedback.model";
 import catchAsync from '../utils/catchAsync.util';
 import AppError from "../utils/appError.util";
-
+import mongoose from 'mongoose';
 export const addFeedback = catchAsync(async (req, res, next) => {
     const { productId, classify, rating, comment } = req.body;
     const user = req.user;
@@ -18,7 +18,7 @@ export const addFeedback = catchAsync(async (req, res, next) => {
         classify,
         rating,
         comment: comment || '',
-        images: req.files['images'] ? req.files['images'].map(file => file.path) : [],
+        // images: req.files['images'] ? req.files['images'].map(file => file.path) : [],
     });
 
     // Populate thêm thông tin chi tiết của người dùng và sản phẩm
@@ -37,7 +37,7 @@ export const getAllFeedbacksByProduct = catchAsync(async (req, res) => {
     const { productId } = req.params;
 
     const feedbacks = await Feedback.find({ productId })
-        .populate('user', 'name avatar')
+        .populate('user', 'fullName avatar')
         .populate('productId', 'name coverImage');
 
     if (feedbacks.length === 0) {
@@ -57,43 +57,14 @@ export const getAllFeedbacksByProduct = catchAsync(async (req, res) => {
 });
 
 
-export const deleteFeedback = catchAsync(async (req, res, next) => {
-    const { feedbackId } = req.params;
 
-    // Kiểm tra xem người dùng đã đăng nhập chưa
-    if (!req.user) {
-        return next(new AppError('You need to be logged in to delete feedback.', 401));
-    }
-
-    // Tìm bình luận theo feedbackId và populate thông tin người dùng
-    const feedback = await Feedback.findById(feedbackId).populate('user');
-
-    // Kiểm tra xem bình luận có tồn tại không
-    if (!feedback) {
-        return next(new AppError('Feedback not found!', 404));
-    }
-
-    // Kiểm tra quyền truy cập: chỉ cho phép người dùng đã tạo bình luận mới được xóa
-    if (feedback.user._id.toString() !== req.user._id.toString()) {
-        return next(new AppError('You do not have permission to delete this feedback.', 403));
-    }
-
-    // Xóa bình luận
-    await Feedback.findByIdAndDelete(feedbackId);
-
-    // Trả về thông báo thành công
-    res.status(200).json({
-        status: 'success',
-        message: 'Feedback deleted successfully.',
-    });
-});
 
 
 export const updateFeedback = catchAsync(async (req, res, next) => {
     const { feedbackId } = req.params;
 
     if (!req.user) {
-        return next(new AppError('You need to be logged in to update feedback.', 401));
+        return next(new AppError('bạn chưa đăng nhập vui lòng đăng nhập để bình luận', 401));
     }
 
     const feedback = await Feedback.findById(feedbackId).populate('user'); // Populate để lấy thông tin người dùng
@@ -105,7 +76,7 @@ export const updateFeedback = catchAsync(async (req, res, next) => {
 
     // Kiểm tra quyền truy cập: chỉ cho phép người dùng đã tạo bình luận mới được cập nhật
     if (feedback.user._id.toString() !== req.user._id.toString()) {
-        return next(new AppError('You do not have permission to update this feedback.', 403));
+        return next(new AppError('Bạn không được xóa bình luận của người khác', 403));
     }
 
     // Khởi tạo một đối tượng chứa các trường cập nhật
@@ -113,7 +84,7 @@ export const updateFeedback = catchAsync(async (req, res, next) => {
         classify: req.body.classify || feedback.classify, // Nếu không có, giữ nguyên giá trị cũ
         rating: req.body.rating || feedback.rating,
         comment: req.body.comment || feedback.comment,
-        images: req.files['images'] ? req.files['images'].map(file => file.path) : feedback.images, // Cập nhật ảnh nếu có
+        // images: req.files['images'] ? req.files['images'].map(file => file.path) : feedback.images, 
     };
 
     // Cập nhật các trường cần thiết
@@ -179,3 +150,79 @@ export const toggleLikeFeedback = catchAsync(async (req, res, next) => {
         },
     });
 });
+
+export const getAllFeedbacks = catchAsync(async (req, res) => {
+    // Lấy tất cả các bình luận
+    const feedbacks = await Feedback.find()
+        .populate('user', 'fullName avatar')
+        .populate('productId', 'name coverImg');
+
+    // Kiểm tra nếu không có bình luận nào
+    if (feedbacks.length === 0) {
+        return res.status(404).json({
+            status: 'fail',
+            message: 'No feedbacks found.',
+        });
+    }
+
+    // Trả về danh sách bình luận
+    res.status(200).json({
+        status: 'success',
+        results: feedbacks.length,
+        data: {
+            feedbacks,
+        },
+    });
+});
+
+
+
+export const deleteFeedbackstStatus = async (req, res, next) => {
+    try {
+        const { feedbackId } = req.params;
+        console.log('Received ID:', feedbackId);
+        const feedback = await Feedback.findById(feedbackId)
+        console.log('ID 2', feedback);
+        if (!feedback) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Không tìm thấy feedback với ID được cung cấp',
+            });
+        }
+
+        feedback.classify = !feedback.classify;
+        await feedback.save();
+
+        res.status(200).json({
+            status: 'success',
+            data: {
+                feedbackId: feedback._id,
+                classify: feedback.classify,
+            },
+        });
+    } catch (error) {
+        console.error(error);
+        next(error);
+    }
+};
+
+
+export const deleteFeedback = catchAsync(async (req, res, next) => {
+    const { feedbackId } = req.params;
+    if (!req.user) {
+        return next(new AppError('bạn chưa đăng nhập vui lòng đăng nhập để bình luận', 401));
+    }
+    const feedback = await Feedback.findById(feedbackId).populate('user');
+    if (!feedback) {
+        return next(new AppError('Feedback not found!', 404));
+    }
+    if (feedback.user._id.toString() !== req.user._id.toString()) {
+        return next(new AppError('Bạn không được xóa bình luận của người khác', 403));
+    }
+    await Feedback.findByIdAndDelete(feedbackId);
+    res.status(200).json({
+        status: 'success',
+        message: 'Feedback deleted successfully.',
+    });
+});
+

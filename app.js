@@ -13,6 +13,7 @@ import cartRouter from './routes/cart.route.js';
 import orderRouter from './routes/order.route.js';
 import paymentRouter from './routes/payment.route.js';
 import billRouter from './routes/bill.route.js';
+import feedbackRouter from './routes/feedback.router.js';
 
 const app = express();
 app.use(cors());
@@ -37,6 +38,7 @@ app.use('/api/v1/cart', cartRouter);
 app.use('/api/v1/orders', orderRouter);
 app.use('/api/v1/payments', paymentRouter);
 app.use('/api/v1/bills', billRouter);
+app.use('/api/v1/feedback', feedbackRouter);
 
 app.all('*', (req, res, next) => {
   return next(
