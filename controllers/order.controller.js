@@ -19,6 +19,7 @@ import {
 import {
   RollbackInventoryOnCancel,
   RollbackQuantityProduct,
+  rollbackVoucherOnCancel,
 } from '../utils/order.util';
 import Voucher from '../models/voucher.model';
 
@@ -100,21 +101,37 @@ export const createOrder = catchAsync(async (req, res, next) => {
 
     if (discountCode) {
       const voucher = await Voucher.findOne({ code: discountCode });
-      if (voucher) {
-        if (voucher.userIds.includes(userId)) {
-          return next(
-            new AppError(
-              'Bạn đã sử dụng voucher này rồi',
-              StatusCodes.BAD_REQUEST
-            )
-          );
-        }
-      } else {
+
+      if (!voucher) {
         return next(
           new AppError('Voucher này không tồn tại', StatusCodes.BAD_REQUEST)
         );
       }
 
+      // Kiểm tra nếu voucher đã được người dùng sử dụng
+      if (voucher.userIds.includes(userId)) {
+        return next(
+          new AppError(
+            'Bạn đã sử dụng voucher này rồi',
+            StatusCodes.BAD_REQUEST
+          )
+        );
+      }
+
+      // Kiểm tra số lượng voucher
+      if (voucher.quantity <= 0) {
+        return next(
+          new AppError('Voucher đã hết số lượng', StatusCodes.BAD_REQUEST)
+        );
+      }
+
+      if (voucher.status !== 'active') {
+        return next(
+          new AppError('Voucher này không khả dụng', StatusCodes.BAD_REQUEST)
+        );
+      }
+
+      // Cập nhật voucher khi đủ điều kiện
       await Voucher.findOneAndUpdate(
         { code: discountCode },
         { $push: { userIds: userId }, $inc: { usedCount: 1, quantity: -1 } }
@@ -360,8 +377,9 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     try {
       updateOrder.status = status;
       await updateOrder.save();
-      // Rollback số lượng sản phẩm trong kho
-      await RollbackInventoryOnCancel(updateOrder.orderItems, next);
+      await RollbackInventoryOnCancel(updateOrder.orderItems);
+      if (updateOrder.discountVoucher)
+        await rollbackVoucherOnCancel(updateOrder.discountCode, next);
     } catch (error) {
       return next(
         new AppError(
@@ -390,8 +408,6 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     new Date(updateOrder.createdAt),
     'dd/MM/yyyy HH:mm:ss'
   );
-
-  console.log(updateOrder);
 
   if (status === 'Đã giao hàng') {
     updateOrder.status = status;
@@ -456,12 +472,20 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     );
   }
 
-  const totalOrderPrice = orderDetails.reduce(
-    (acc, item) => acc + item.totalItemPrice,
-    0
-  );
-
   if (status === 'Đã nhận được hàng') {
+    await Promise.all(
+      updateOrder.orderItems.map(async (item) => {
+        const product = await Product.findById(item.productId);
+        if (!product) return;
+
+        // Tăng `saleCount` của sản phẩm
+        product.saleCount += item.quantity;
+
+        // Lưu lại sản phẩm
+        await product.save();
+      })
+    );
+
     const historyTransaction = new HistoryTransaction({
       idUser: req.user.id,
       idBill: id,
@@ -495,5 +519,20 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     //   status: updateOrder.status,
     //   orderItems: orderDetails,
     // },
+  });
+});
+export const getAllOrder = catchAsync(async (req, res, next) => {
+  const orders = await Order.find();
+  if (!orders) {
+    res.status(StatusCodes.OK).json({
+      status: true,
+      message: 'Lấy thành công tất cả order',
+      data: null,
+    });
+  }
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Lấy thành công tất cả order',
+    data: orders,
   });
 });

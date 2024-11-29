@@ -2,6 +2,7 @@ import Product from '../models/product.model';
 import mongoose from 'mongoose';
 import AppError from './appError.util';
 import { StatusCodes } from 'http-status-codes';
+import Voucher from '../models/voucher.model';
 
 export async function RollbackQuantityProduct(
   orderItems,
@@ -88,7 +89,7 @@ export async function RollbackQuantityProduct(
  * @param orderItems Danh sách sản phẩm trong đơn hàng
  * @param next Middleware tiếp theo
  */
-export async function RollbackInventoryOnCancel(orderItems, next) {
+export async function RollbackInventoryOnCancel(orderItems) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -114,7 +115,6 @@ export async function RollbackInventoryOnCancel(orderItems, next) {
           ],
         }
       );
-      console.log(result);
 
       if (result.modifiedCount === 0) {
         throw new AppError(
@@ -132,3 +132,20 @@ export async function RollbackInventoryOnCancel(orderItems, next) {
     session.endSession();
   }
 }
+export const rollbackVoucherOnCancel = async (discountCode, next) => {
+  try {
+    const voucher = await Voucher.findOne({ code: discountCode });
+    if (voucher) {
+      voucher.quantity += 1;
+      voucher.usedCount -= 1;
+      await voucher.save();
+    }
+  } catch (error) {
+    return next(
+      new AppError(
+        'Không thể rollback số lượng voucher.',
+        StatusCodes.INTERNAL_SERVER_ERROR
+      )
+    );
+  }
+};

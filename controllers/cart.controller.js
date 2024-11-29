@@ -8,11 +8,13 @@ import { StatusCodes } from 'http-status-codes';
 export const addItemToCart = catchAsync(async (req, res, next) => {
   const userId = req.user.id;
   const { productId, variantId, sizeId, quantity } = req.body;
+
   // Lấy sản phẩm dựa trên productId
   const product = await Product.findById(productId);
   if (!product) {
     return next(new AppError('Sản phẩm không tồn tại!', 404));
   }
+
   // Lấy biến thể (variant) của sản phẩm
   const variant = product.variants.id(variantId);
   if (!variant) {
@@ -23,6 +25,16 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
   const size = variant.sizes.id(sizeId);
   if (!size) {
     return next(new AppError('Kích thước không tồn tại!', 404));
+  }
+
+  // Kiểm tra số lượng sản phẩm trong kho
+  if (size.inventory < quantity) {
+    return next(
+      new AppError(
+        `Số lượng yêu cầu vượt quá số lượng tồn kho (${size.stock})!`,
+        400
+      )
+    );
   }
 
   // Lấy ảnh đầu tiên của biến thể
@@ -41,6 +53,16 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
     );
 
     if (existingItem) {
+      // Kiểm tra nếu tổng số lượng vượt quá kho
+      if (size.stock < existingItem.quantity + quantity) {
+        return next(
+          new AppError(
+            `Số lượng yêu cầu vượt quá số lượng tồn kho (${size.stock})!`,
+            400
+          )
+        );
+      }
+
       // Nếu có, cập nhật số lượng
       existingItem.quantity += quantity || 1;
     } else {
@@ -54,6 +76,15 @@ export const addItemToCart = catchAsync(async (req, res, next) => {
     }
   } else {
     // Nếu chưa có giỏ hàng, tạo giỏ hàng mới
+    if (quantity > size.stock) {
+      return next(
+        new AppError(
+          `Số lượng yêu cầu vượt quá số lượng tồn kho (${size.stock})!`,
+          400
+        )
+      );
+    }
+
     cart = await Cart.create({
       userId,
       items: [

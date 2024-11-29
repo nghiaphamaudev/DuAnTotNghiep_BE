@@ -62,6 +62,10 @@ const userSchema = new mongoose.Schema(
       required: true,
       default: 'Khác',
     },
+    blockReason: {
+      type: String,
+      required: false,
+    },
     avatar: {
       type: String,
       default:
