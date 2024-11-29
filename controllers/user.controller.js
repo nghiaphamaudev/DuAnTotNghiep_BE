@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { StatusCodes } from 'http-status-codes';
 import cloudinary from '../configs/cloudiary.config';
 import { updateMeSchema, addAddressSchema } from '../validator/user.validator';
+import { sendMaiBlockedOrder } from '../services/email.service';
 
 // Check lại mật khẩu user nhập vào có đúng mới xóa
 export const deleteMe = catchAsync(async (req, res, next) => {
@@ -344,16 +345,28 @@ export const removeFavoriteProduct = catchAsync(async (req, res, next) => {
 });
 
 export const getAllUser = catchAsync(async (req, res, next) => {
+  // Lấy id user hiện tại từ req.user (middleware xác thực)
+  const currentUserId = req.user.id;
+
   // Lấy số trang và số bản ghi trên mỗi trang từ query params
   const page = parseInt(req.query.page) || 1; // Mặc định là trang 1
   const limit = 6; // Số bản ghi trên mỗi trang
   const skip = (page - 1) * limit;
 
-  // Tìm tất cả người dùng với giới hạn và phân trang
-  const users = await User.find().skip(skip).limit(limit);
+  // Tìm tất cả người dùng ngoại trừ user hiện tại và có role là admin
+  const users = await User.find({
+    _id: { $ne: currentUserId },
+    role: { $ne: 'admin' },
+  })
+    .skip(skip)
+    .limit(limit);
+  console.log(users);
 
-  // Đếm tổng số người dùng để trả về tổng số trang
-  const totalUsers = await User.countDocuments();
+  // Đếm tổng số người dùng (ngoại trừ user hiện tại và admin) để tính tổng số trang
+  const totalUsers = await User.countDocuments({
+    _id: { $ne: currentUserId },
+    role: { $ne: 'admin' },
+  });
   const totalPages = Math.ceil(totalUsers / limit);
 
   res.status(200).json({
@@ -452,20 +465,46 @@ export const getUserById = catchAsync(async (req, res, next) => {
 
 export const toggleBlockUserById = catchAsync(async (req, res, next) => {
   const userId = req.params.userId;
-  const { shouldBlock } = req.body;
+  const { shouldBlock, note } = req.body;
 
   const user = await User.findById(userId);
+  console.log(user);
+
   if (!user) {
     return next(
       new AppError('Người dùng không tồn tại!', StatusCodes.NOT_FOUND)
     );
   }
 
-  await user.toggleBlockUser(shouldBlock);
+  if (note && shouldBlock === false) {
+    console.log(shouldBlock);
+    user.active = shouldBlock;
+
+    try {
+      await user.save();
+    } catch (err) {
+      console.error('Error saving user:', err);
+      return next(
+        new AppError(
+          'Lỗi lưu thông tin người dùng!',
+          StatusCodes.INTERNAL_SERVER_ERROR
+        )
+      );
+    }
+
+    await sendMaiBlockedOrder(
+      user.email,
+      'Khoá tài khoản',
+      user.fullName,
+      note
+    );
+  } else {
+    user.active = shouldBlock;
+    await user.save();
+  }
 
   res.status(StatusCodes.OK).json({
     status: true,
-    message: 'Thành công',
     message: shouldBlock
       ? 'Người dùng đã bị chặn thành công'
       : 'Người dùng đã được bỏ chặn thành công',

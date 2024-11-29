@@ -76,6 +76,7 @@ const orderSchema = new mongoose.Schema(
         'Đã giao hàng',
         'Hoàn đơn',
         'Đã hủy',
+        'Đã nhận được hàng',
       ],
       default: 'Chờ xác nhận',
     },
@@ -86,8 +87,8 @@ const orderSchema = new mongoose.Schema(
     },
     discountVoucher: {
       type: Number,
-      required: true,
     },
+
     statusShip: {
       type: Boolean,
       default: false,
@@ -110,6 +111,12 @@ const orderSchema = new mongoose.Schema(
     },
   }
 );
+orderSchema.virtual('totalCost').get(function () {
+  const shippingCost = this.shippingCost ?? 0; // Sử dụng nullish coalescing (nếu undefined thì là 0)
+  const voucherDiscount = this.discountVoucher ?? 0;
+  const productTotal = this.totalPrice ?? 0; // Nếu không có totalPrice, coi như 0
+  return productTotal + shippingCost - voucherDiscount;
+});
 
 orderSchema.virtual('id').get(function () {
   return this._id.toHexString();

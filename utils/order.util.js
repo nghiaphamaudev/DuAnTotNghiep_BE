@@ -35,18 +35,17 @@ export async function RollbackQuantityProduct(
         );
       }
 
-      // Nếu là hủy đơn, cộng lại số lượng sản phẩm
       const updateOperation = isCancel
         ? {
             $inc: {
               'variants.$[variant].sizes.$[size].inventory': item.quantity,
             },
-          } // Cộng lại
+          }
         : {
             $inc: {
               'variants.$[variant].sizes.$[size].inventory': -item.quantity,
             },
-          }; // Trừ đi
+          };
 
       const result = await Product.updateOne(
         {
@@ -70,6 +69,56 @@ export async function RollbackQuantityProduct(
       if (result.modifiedCount === 0) {
         throw new AppError(
           `Không thể cập nhật tồn kho cho sản phẩm với ID: ${item.productId}, màu: ${item.variantId}, size: ${item.sizeId}.`,
+          StatusCodes.BAD_REQUEST
+        );
+      }
+    }
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error; // Ném lỗi để dừng quá trình
+  } finally {
+    session.endSession();
+  }
+}
+
+/**
+ * Rollback lại số lượng sản phẩm trong kho khi hủy đơn hàng
+ * @param orderItems Danh sách sản phẩm trong đơn hàng
+ * @param next Middleware tiếp theo
+ */
+export async function RollbackInventoryOnCancel(orderItems, next) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    for (const item of orderItems) {
+      // Cộng lại số lượng sản phẩm đã đặt vào kho
+      const result = await Product.updateOne(
+        {
+          _id: item.productId,
+          'variants._id': item.variantId,
+          'variants.sizes._id': item.sizeId,
+        },
+        {
+          $inc: {
+            'variants.$[variant].sizes.$[size].inventory': item.quantity,
+          },
+        },
+        {
+          session,
+          arrayFilters: [
+            { 'variant._id': item.variantId },
+            { 'size._id': item.sizeId }, // Không cần kiểm tra inventory
+          ],
+        }
+      );
+      console.log(result);
+
+      if (result.modifiedCount === 0) {
+        throw new AppError(
+          `Không thể rollback tồn kho cho sản phẩm với ID: ${item.productId}, màu: ${item.variantId}, size: ${item.sizeId}.`,
           StatusCodes.BAD_REQUEST
         );
       }
