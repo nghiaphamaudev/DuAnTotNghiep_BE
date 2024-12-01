@@ -4,6 +4,10 @@ import catchAsync from '../utils/catchAsync.util';
 import AppError from '../utils/appError.util';
 import slugify from 'slugify';
 import { cloudinaryDelete } from '../middlewares/uploadCloud.middleware';
+import mongoose from 'mongoose';
+
+
+
 
 export const createProduct = catchAsync(async (req, res, next) => {
   // Kiểm tra và lấy ảnh bìa
@@ -147,14 +151,12 @@ export const updateProduct = catchAsync(async (req, res, next) => {
   const coverImage = req.files.coverImage ? req.files.coverImage[0] : null;
   const { name, category, description, variants, imagesToDelete } = req.body;
 
-  // Kiểm tra trường bắt buộc
   if (!name || !category || !description || !variants || variants.length === 0) {
     return next(
       new AppError('Tất cả các trường bắt buộc phải được cung cấp', StatusCodes.BAD_REQUEST)
     );
   }
 
-  // Tìm sản phẩm cũ
   const existingProduct = await Product.findById(req.params.id);
   if (!existingProduct) {
     return next(
@@ -162,59 +164,84 @@ export const updateProduct = catchAsync(async (req, res, next) => {
     );
   }
 
-  // Cập nhật thông tin sản phẩm cơ bản
   const updatedData = {
     name,
     category,
     description,
     slug: slugify(name, { lower: true, strict: true }),
-    variants: await Promise.all(variants.map(async (variant, index) => {
-      const variantImages = req.body[`variants[${index}][images]`] || [];
-      const variantImageFiles = req.files[`variants[${index}][imageFiles]`] || [];
-      let updatedImages = existingProduct.variants[index]?.images || [];
-      if (variantImages.length > 0) {
-        updatedImages = variantImages;
-      }
-      const newImagesFromFiles = variantImageFiles.map(file => file.path);
-      updatedImages = [...updatedImages, ...newImagesFromFiles];
-      if (imagesToDelete && imagesToDelete.length > 0) {
-        updatedImages = updatedImages.filter(img => !imagesToDelete.includes(img));
-        if (imagesToDelete.length > 0) {
-          await cloudinaryDelete(imagesToDelete);
-        }
-      }
-
-      return {
-        ...variant,
-        images: updatedImages,
-        imageFiles: [],
-      };
-    })),
   };
+
+  // Xử lý các biến thể đã tồn tại
+  updatedData.variants = await Promise.all(variants.map(async (variant, index) => {
+    const variantImages = req.body[`variants[${index}][images]`] || [];
+    const variantImageFiles = req.files[`variants[${index}][imageFiles]`] || [];
+    let updatedImages = existingProduct.variants[index]?.images || [];
+
+    if (variantImages.length > 0) {
+      updatedImages = variantImages;
+    }
+
+    const newImagesFromFiles = variantImageFiles.map(file => file.path);
+    updatedImages = [...updatedImages, ...newImagesFromFiles];
+
+    if (imagesToDelete && imagesToDelete.length > 0) {
+      updatedImages = updatedImages.filter(img => !imagesToDelete.includes(img));
+      if (imagesToDelete.length > 0) {
+        await cloudinaryDelete(imagesToDelete);
+      }
+    }
+
+    const updatedSizes = variant.sizes.map((size, sizeIndex) => {
+      size.status = size.inventory > 0;
+      size._id = existingProduct.variants[index]?.sizes[sizeIndex]?._id;  // Giữ nguyên _id của size
+      return size;
+    });
+
+    const updatedStatus = updatedSizes.some(size => size.status === true);
+
+    return {
+      ...variant,
+      images: updatedImages,
+      imageFiles: [],
+      sizes: updatedSizes,
+      status: updatedStatus,
+      _id: existingProduct.variants[index]?._id,  // Giữ nguyên _id của variant
+    };
+  }));
+
+  // Kiểm tra và thêm các biến thể mới nếu chưa tồn tại
   const newVariants = variants.slice(existingProduct.variants.length);
   newVariants.forEach((newVariant) => {
-    const isDuplicate = existingProduct.variants.some(existingVariant =>
-      existingVariant.id === newVariant.id || existingVariant.slug === newVariant.slug
+    // Kiểm tra xem biến thể mới đã tồn tại chưa (dựa trên `slug` hoặc `id`)
+    const isDuplicate = updatedData.variants.some(existingVariant =>
+      existingVariant.slug === newVariant.slug  // Kiểm tra trùng lặp dựa trên slug
     );
     if (!isDuplicate) {
-      updatedData.variants.push(newVariant);
+      updatedData.variants.push(newVariant);  // Thêm biến thể mới nếu chưa có
     }
   });
+
+  // Cập nhật hình ảnh bìa
   if (coverImage) {
     updatedData.coverImg = coverImage.path;
   } else {
     updatedData.coverImg = existingProduct.coverImg;
   }
+
+  // Cập nhật sản phẩm với $set để không thay thế toàn bộ tài liệu
   const updatedProduct = await Product.findByIdAndUpdate(
     req.params.id,
-    updatedData,
+    { $set: updatedData },  // Chỉ cập nhật các trường đã thay đổi
     { new: true, runValidators: true }
   );
+
   if (!updatedProduct) {
     return next(
       new AppError('Không tìm thấy sản phẩm với ID này', StatusCodes.NOT_FOUND)
     );
   }
+
+  // Trả về phản hồi
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'Thành công',
@@ -223,14 +250,6 @@ export const updateProduct = catchAsync(async (req, res, next) => {
     },
   });
 });
-
-
-
-
-
-
-
-
 
 
 
@@ -251,6 +270,7 @@ export const relatedProduct = catchAsync(async (req, res, next) => {
     data: product,
   });
 });
+
 
 export const deleteProduct = catchAsync(async (req, res, next) => {
   const product = await Product.findByIdAndDelete(req.params.id);
@@ -282,3 +302,38 @@ export const deleteProductStatus = async (req, res, next) => {
     },
   });
 };
+
+
+export const updateVariantStatusById = async (req, res, next) => {
+  const { id, variantId } = req.params;
+  const product = await Product.findById(id);
+
+  if (!product) {
+    return next(new AppError('Product not found', 404));
+  }
+  const variant = product.variants.find(
+    (v) => v.id.toString() === variantId.toString()
+  );
+  if (!variant) {
+    return next(new AppError('Variant not found', 404));
+  }
+  variant.status = !variant.status;
+  await product.save();
+  res.status(200).json({
+    status: 'success',
+    data: {
+      id: product._id,
+      variant: {
+        id: variant.id,
+        color: variant.color,
+        status: variant.status,
+      },
+    },
+  });
+};
+
+
+
+
+
+

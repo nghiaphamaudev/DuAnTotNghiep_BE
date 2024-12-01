@@ -1,3 +1,4 @@
+
 import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import slugify from 'slugify';
@@ -11,7 +12,7 @@ const sizeSchema = new mongoose.Schema(
       type: Boolean,
       required: true, // Đảm bảo trường status luôn có giá trị
       default: function () {
-        return this.inventory > 0; // Nếu inventory > 0 thì status là true, nếu không thì false
+        return this.inventory >= 0; // Nếu inventory > 0 thì status là true, nếu không thì false
       },
     },
   },
@@ -33,7 +34,7 @@ const sizeSchema = new mongoose.Schema(
 
 // Hook pre-save để cập nhật `status` dựa trên `inventory`
 sizeSchema.pre('save', function (next) {
-  this.status = this.inventory > 0; // Nếu inventory > 0, status là true
+  this.status = this.inventory >= 0; // Nếu inventory > 0, status là true
   next();
 });
 
@@ -80,6 +81,7 @@ const productSchema = new mongoose.Schema(
     coverImg: { type: String, required: true },
     ratingAverage: { type: Number, default: 0 },
     variants: [variantSchema],
+    orderQuantity: { type: Number, default: 0 },
     ratingQuantity: { type: Number, default: 0 },
     description: { type: String, required: true },
     isActive: {

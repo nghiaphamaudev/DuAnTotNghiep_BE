@@ -2,6 +2,7 @@ import Product from '../models/product.model';
 import Cart from '../models/cart.model';
 import Order from '../models/order.model';
 import HistoryBill from '../models/historyBill.model';
+import HistoryTransaction from '../models/historyTransaction.model';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import { format } from 'date-fns';
@@ -10,15 +11,34 @@ import catchAsync from '../utils/catchAsync.util';
 import mongoose from 'mongoose';
 import AppError from '../utils/appError.util';
 import { checkAddressOrderSchema } from '../validator/user.validator';
-import { uploadProductImages } from '../middlewares/uploadCloud.middleware';
 import { createPaymentUrl } from '../services/payment.service';
-import { sendMailServiceConfirmOrder } from '../services/email.service';
+import {
+  sendMailDelivered,
+  sendMailServiceConfirmOrder,
+} from '../services/email.service';
+import {
+  RollbackInventoryOnCancel,
+  RollbackQuantityProduct,
+} from '../utils/order.util';
+import Voucher from '../models/voucher.model';
 
 function calculateTotalPrice(items) {
   return items.reduce((total, item) => {
     return total + item.quantity * item.price;
   }, 0);
 }
+
+const applyVoucher = (voucher, totalPrice) => {
+  if (voucher.discountType === 'percentage') {
+    return totalPrice - (totalPrice * voucher.discountPercentage) / 100;
+  }
+
+  if (voucher.discountType === 'amount') {
+    return Math.max(0, totalPrice - voucher.discountAmount);
+  }
+
+  return totalPrice; // Nếu không áp dụng voucher
+};
 
 function getLastName(fullName) {
   if (!fullName) return ''; // Trường hợp chuỗi rỗng hoặc undefined
@@ -47,82 +67,129 @@ const updateCartAfterOrder = async (userId, orderItems) => {
     console.error('Lỗi khi cập nhật giỏ hàng:', error);
   }
 };
+
 export const createOrder = catchAsync(async (req, res, next) => {
-  const userId = req.user.id; // Lấy ID người dùng từ token
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  const { orderItems, ...bodyData } = req.body; // Tách sản phẩm đã chọn và dữ liệu còn lại
-  const {
-    receiver,
-    phoneNumber,
-    address,
-    paymentMethod,
-    discountCode,
-    discountVoucher,
-    shippingCost,
-  } = bodyData;
+  try {
+    const userId = req.user.id;
+    const { orderItems, ...bodyData } = req.body;
 
-  // Kiểm tra tính hợp lệ của địa chỉ
-  const { error } = checkAddressOrderSchema.validate(
-    { receiver, phoneNumber, address },
-    { abortEarly: false }
-  );
-  if (error) {
-    const messages = error.details.map((item) => item.message);
-    return res.status(StatusCodes.BAD_REQUEST).json({ messages });
-  }
+    const {
+      receiver,
+      phoneNumber,
+      address,
+      paymentMethod,
+      discountVoucher,
+      discountCode,
+      shippingCost,
+    } = bodyData;
 
-  const code = `FS${dayjs().format('YYYYMMDDHHmmss')}`;
-  const totalPrice = calculateTotalPrice(orderItems);
-
-  const order = new Order({
-    userId,
-    code,
-    orderItems,
-    totalPrice,
-    receiver,
-    phoneNumber,
-    address,
-    paymentMethod,
-    discountCode,
-    shippingCost,
-    discountVoucher,
-  });
-
-  await order.save();
-  updateCartAfterOrder(userId, orderItems);
-
-  const historyBill = new HistoryBill({
-    userId: userId,
-    idBill: order.id,
-    creator: req.user.fullName,
-    role: req.user.role,
-    statusBill: 'Chờ xác nhận',
-    note: '',
-  });
-  await historyBill.save();
-
-  if (paymentMethod === 'VNPAY') {
-    const urlPayment = createPaymentUrl(
-      req,
-      totalPrice,
-      code,
-      `Thanh toán đơn hàng ${code}`
+    const { error } = checkAddressOrderSchema.validate(
+      { receiver, phoneNumber, address },
+      { abortEarly: false }
     );
+
+    if (error) {
+      const messages = error.details.map((item) => item.message);
+      return res.status(StatusCodes.BAD_REQUEST).json({ messages });
+    }
+
+    let totalPrice = calculateTotalPrice(orderItems);
+
+    if (discountCode) {
+      const voucher = await Voucher.findOne({ code: discountCode });
+      if (voucher) {
+        if (voucher.userIds.includes(userId)) {
+          return next(
+            new AppError(
+              'Bạn đã sử dụng voucher này rồi',
+              StatusCodes.BAD_REQUEST
+            )
+          );
+        }
+      } else {
+        return next(
+          new AppError('Voucher này không tồn tại', StatusCodes.BAD_REQUEST)
+        );
+      }
+
+      await Voucher.findOneAndUpdate(
+        { code: discountCode },
+        { $push: { userIds: userId }, $inc: { usedCount: 1, quantity: -1 } }
+      );
+    }
+
+    const code = `FS${dayjs().format('YYYYMMDDHHmmss')}`;
+
+    // Gọi RollbackQuantityProduct và đảm bảo sẽ dừng quá trình nếu có lỗi
+    await RollbackQuantityProduct(orderItems, next);
+
+    const order = new Order({
+      userId,
+      code,
+      orderItems,
+      totalPrice,
+      receiver,
+      phoneNumber,
+      address,
+      paymentMethod,
+      shippingCost,
+      discountCode,
+      discountVoucher,
+    });
+    await order.save({ session });
+
+    const historyBill = new HistoryBill({
+      userId: userId,
+      idBill: order.id,
+      creator: req.user.fullName,
+      role: req.user.role,
+      statusBill: 'Chờ xác nhận',
+      note: '',
+    });
+    await historyBill.save({ session });
+
+    if (paymentMethod === 'VNPAY') {
+      const urlPayment = createPaymentUrl(
+        req,
+        totalPrice,
+        order.id,
+        `Thanh toán đơn hàng ${code}`
+      );
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return res.status(200).json({
+        status: true,
+        message: 'Đơn hàng được tạo thành công, chuyển hướng thanh toán',
+        data: { paymentUrl: urlPayment },
+      });
+    }
+
+    await updateCartAfterOrder(userId, orderItems);
+
+    await session.commitTransaction();
+    session.endSession();
 
     return res.status(200).json({
       status: true,
-      message: 'Đơn hàng được tạo thành công, chuyển hướng thanh toán',
-      data: {
-        paymentUrl: urlPayment,
-      },
+      message: 'Thành công',
+      data: order,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      status: false,
+      message: error.message,
     });
   }
-
-  return res.status(200).json({
-    message: 'Thành công',
-    data: order,
-  });
 });
+
+// Hàm áp dụng voucher
 
 export const getAllOrderByUserId = catchAsync(async (req, res, next) => {
   const idUser = req.user.id;
@@ -160,12 +227,12 @@ export const getAllOrderByUserId = catchAsync(async (req, res, next) => {
 });
 
 export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
-  const orderId = req.params.orderId;
+  const orderId = new mongoose.Types.ObjectId(req.params.orderId);
 
   // Tìm đơn hàng theo ID và populate các thông tin cần thiết
   const order = await Order.findById(orderId).populate({
     path: 'orderItems.productId',
-    select: 'name coverImg variants ',
+    select: 'name coverImg variants',
   });
 
   // Kiểm tra nếu không tìm thấy đơn hàng
@@ -175,17 +242,33 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
   const orderDetails = await Promise.all(
     order.orderItems.map(async (item) => {
       const product = item.productId;
+
+      if (!product) {
+        throw new AppError('Sản phẩm không tồn tại trong đơn hàng.', 404);
+      }
+
+      // Tìm variant và size
       const variant = product.variants.find(
-        (v) => v._id.toString() === item.variantId
+        (v) => v._id.toString() === item.variantId.toString()
       );
+
+      // Kiểm tra nếu không tìm thấy variant
+      if (!variant) {
+        throw new AppError('Không tìm thấy variant cho sản phẩm.', 404);
+      }
       const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
+
+      // Kiểm tra nếu không tìm thấy size
+      if (!size) {
+        throw new AppError('Không tìm thấy size cho variant.', 404);
+      }
 
       return {
         id: item._id,
         productId: product._id,
         name: product.name,
         color: variant.color,
-        images: variant.images[0],
+        image: variant.images[0], // Bạn có thể thay đổi cách hiển thị ảnh nếu cần
         size: size.nameSize,
         price: size.price,
         quantity: item.quantity,
@@ -194,46 +277,78 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     })
   );
 
-  // Tính tổng giá tiền cho đơn hàng (có thể đã được lưu nhưng tính lại để đảm bảo)
-  const totalOrderPrice = orderDetails.reduce(
-    (acc, item) => acc + item.totalItemPrice,
-    0
-  );
+  // Tính tổng giá tiền cho đơn hàng
 
+  // Trả lại lịch sử đơn hàng
+  const historyBills = await HistoryBill.find({ idBill: orderId });
+
+  const formattedHistoryBills = historyBills.map((bill) => ({
+    createdAt: format(new Date(bill.createdAt), 'dd/MM/yyyy HH:mm:ss'),
+    creator: bill.creator,
+    role: bill.role,
+    status: bill.statusBill,
+    note: bill.note,
+  }));
+
+  // Trả lại thông tin đơn hàng
+  const orderInfor = {
+    orderId: order._id,
+    code: order.code,
+    creator: req.user.fullName,
+    address: order.address,
+    paymentMethod: order.paymentMethod,
+    phoneNumber: order.phoneNumber,
+    status: order.status,
+    receiver: order.receiver,
+  };
+
+  // Trả lại lịch sử thanh toán
+  const historyTransaction = await HistoryTransaction.findOne({
+    idBill: orderId,
+  });
+
+  // Kiểm tra nếu không tìm thấy lịch sử thanh toán
+
+  const formattedHistoryTransaction = historyTransaction
+    ? {
+        totalPrice: historyTransaction.totalMoney,
+        type: historyTransaction.type,
+        createdAt: format(
+          new Date(historyTransaction.createdAt),
+          'dd/MM/yyyy HH:mm:ss'
+        ),
+      }
+    : null;
+
+  // Trả lại kết quả
   res.status(200).json({
     status: true,
-    message: 'Lấy chi tiết đơn hàng thành công.',
+    message: 'Lấy thành công.',
     data: {
-      orderId: order._id,
-      code: order.code,
-      totalOrderPrice, // Tổng giá tiền của đơn hàng
+      orderInfor,
+      totalPrice: order.totalPrice,
+      shippingCost: order.shippingCost,
+      discountVoucher: order.discountVoucher,
+      totalCost: order.totalCost, // Tổng giá tiền của đơn hàng
       createdAt: format(new Date(order.createdAt), 'dd/MM/yyyy HH:mm:ss'),
-      status: order.status,
       orderItems: orderDetails,
+      historyBill: formattedHistoryBills,
+      historyTransaction: formattedHistoryTransaction,
     },
   });
 });
 
 export const updateStatusOrder = catchAsync(async (req, res, next) => {
-  const currentUser = req.user;
-
-  const nameUser = getLastName(currentUser.fullName);
   const { idOrder, status, statusShip } = req.body;
+
   const id = new mongoose.Types.ObjectId(idOrder);
+  let updateOrder = await Order.findById(id);
+
   if (!status) {
     return next(
       new AppError('Chuyển trạng thái thất bại', StatusCodes.BAD_REQUEST)
     );
   }
-
-  let updateOrder = await Order.findByIdAndUpdate(
-    id,
-    { $set: { status, statusShip } },
-    { new: true }
-  ).populate({
-    path: 'orderItems.productId',
-    select: 'name coverImg variants ',
-  });
 
   if (!updateOrder) {
     return next(
@@ -241,13 +356,69 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     );
   }
 
-  //Lay chi tiet don hang
+  if (status === 'Đã hủy' || status === 'Hoàn đơn') {
+    try {
+      updateOrder.status = status;
+      await updateOrder.save();
+      // Rollback số lượng sản phẩm trong kho
+      await RollbackInventoryOnCancel(updateOrder.orderItems, next);
+    } catch (error) {
+      return next(
+        new AppError(
+          'Không thể rollback số lượng sản phẩm.',
+          StatusCodes.INTERNAL_SERVER_ERROR
+        )
+      );
+    }
+  }
+
+  updateOrder = await Order.findByIdAndUpdate(
+    id,
+    { $set: { status, statusShip } },
+    { new: true }
+  )
+    .populate({
+      path: 'orderItems.productId',
+      select: 'name coverImg variants',
+    })
+    .populate({
+      path: 'userId',
+      select: 'email fullName', // Các trường cần lấy từ user
+    });
+
+  const orderDate = format(
+    new Date(updateOrder.createdAt),
+    'dd/MM/yyyy HH:mm:ss'
+  );
+
+  console.log(updateOrder);
+
+  if (status === 'Đã giao hàng') {
+    updateOrder.status = status;
+    await updateOrder.save();
+    const user = {
+      email: updateOrder.userId.email,
+      fullName: updateOrder.userId.fullName,
+    };
+
+    await sendMailDelivered(
+      user,
+      'Đơn hàng đã được giao thành công!',
+      updateOrder.code,
+      orderDate,
+      updateOrder.paymentMethod,
+      updateOrder.totalPrice
+    );
+  }
+
   const orderDetails = await Promise.all(
     updateOrder.orderItems.map(async (item) => {
       const product = item.productId;
+
       const variant = product.variants.find(
         (v) => v._id.toString() === item.variantId
       );
+
       const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
 
       return {
@@ -264,39 +435,65 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     })
   );
 
-  // Tính tổng giá tiền cho đơn hàng (có thể đã được lưu nhưng tính lại để đảm bảo)
+  if (status === 'Đã xác nhận') {
+    const title = `Xác Nhận Đơn Hàng #${updateOrder.code} - Cảm ơn bạn đã mua sắm tại FShirt`;
+
+    await updateOrder.save();
+    updateOrder.save();
+    await sendMailServiceConfirmOrder(
+      updateOrder.code,
+      orderDate,
+      updateOrder.totalPrice,
+      orderDetails,
+      updateOrder.totalCost,
+      updateOrder.discountVoucher,
+      updateOrder.shippingCost,
+      req.user.email,
+      title,
+      updateOrder.receiver,
+      updateOrder.phoneNumber,
+      updateOrder.address
+    );
+  }
+
   const totalOrderPrice = orderDetails.reduce(
     (acc, item) => acc + item.totalItemPrice,
     0
   );
 
-  if (status === 'Đã xác nhận') {
-    const orderDate = format(
-      new Date(updateOrder.createdAt),
-      'dd/MM/yyyy HH:mm:ss'
-    );
-    const title = `Xác Nhận Đơn Hàng #${updateOrder.code} - Cảm ơn bạn đã mua sắm tại FShirt`;
-    await sendMailServiceConfirmOrder(
-      nameUser,
-      updateOrder._id,
-      orderDate,
-      totalOrderPrice,
-      orderDetails,
-      currentUser.email,
-      title
-    );
+  if (status === 'Đã nhận được hàng') {
+    const historyTransaction = new HistoryTransaction({
+      idUser: req.user.id,
+      idBill: id,
+      totalMoney: updateOrder.totalCost,
+      note: '',
+      status: true,
+    });
+    updateOrder.status = status;
+    await updateOrder.save();
+    await historyTransaction.save();
   }
+
+  const historyBill = new HistoryBill({
+    userId: req.user.id,
+    idBill: id,
+    creator: req.user.fullName,
+    role: req.user.role,
+    statusBill: status,
+    note: req.body.note || '',
+  });
+  await historyBill.save();
 
   res.status(200).json({
     status: true,
-    message: 'Lấy chi tiết đơn hàng thành công.',
-    data: {
-      orderId: updateOrder._id,
-      code: updateOrder.code,
-      totalOrderPrice, // Tổng giá tiền của đơn hàng
-      createdAt: format(new Date(updateOrder.createdAt), 'dd/MM/yyyy HH:mm:ss'),
-      status: updateOrder.status,
-      orderItems: orderDetails,
-    },
+    message: 'Cập nhật đơn hàng thành công.',
+    // data: {
+    //   orderId: updateOrder._id,
+    //   code: updateOrder.code,
+    //   totalOrderPrice, // Tổng giá tiền của đơn hàng
+    //   createdAt: format(new Date(updateOrder.createdAt), 'dd/MM/yyyy HH:mm:ss'),
+    //   status: updateOrder.status,
+    //   orderItems: orderDetails,
+    // },
   });
 });

@@ -10,9 +10,9 @@ const categorySchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    categorySeason: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'CategorySeason',
+    imageCategory: {
+      type: String,
+      required: true,
     },
   },
   {

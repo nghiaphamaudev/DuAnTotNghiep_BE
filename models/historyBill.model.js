@@ -34,6 +34,7 @@ const historyBillSchema = new mongoose.Schema(
     },
   },
   {
+    timestamps: true,
     toJSON: {
       virtuals: true,
       transform: (_, ret) => {
@@ -45,7 +46,7 @@ const historyBillSchema = new mongoose.Schema(
       transform: (_, ret) => {
         delete ret._id;
       },
-      timestamps: true,
+
       versionKey: false,
     },
   }

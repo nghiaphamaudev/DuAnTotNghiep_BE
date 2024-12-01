@@ -29,12 +29,6 @@ const orderItemSchema = new mongoose.Schema(
 );
 
 // Trường ảo tính tổng tiền cho mỗi sản phẩm trong giỏ hàng
-orderItemSchema.virtual('totalItemPrice').get(function () {
-  if (this.productId && this.productId.price) {
-    return this.quantity * this.productId.price;
-  }
-  return 0;
-});
 
 orderItemSchema.virtual('id').get(function () {
   return this._id.toHexString();
@@ -80,9 +74,9 @@ const orderSchema = new mongoose.Schema(
         'Đóng gói chờ vận chuyển',
         'Đang giao hàng',
         'Đã giao hàng',
-        'Đã nhận được hàng',
         'Hoàn đơn',
-        'Đã bị hủy',
+        'Đã hủy',
+        'Đã nhận được hàng',
       ],
       default: 'Chờ xác nhận',
     },
@@ -93,8 +87,8 @@ const orderSchema = new mongoose.Schema(
     },
     discountVoucher: {
       type: Number,
-      required: true,
     },
+
     statusShip: {
       type: Boolean,
       default: false,
@@ -117,6 +111,12 @@ const orderSchema = new mongoose.Schema(
     },
   }
 );
+orderSchema.virtual('totalCost').get(function () {
+  const shippingCost = this.shippingCost ?? 0; // Sử dụng nullish coalescing (nếu undefined thì là 0)
+  const voucherDiscount = this.discountVoucher ?? 0;
+  const productTotal = this.totalPrice ?? 0; // Nếu không có totalPrice, coi như 0
+  return productTotal + shippingCost - voucherDiscount;
+});
 
 orderSchema.virtual('id').get(function () {
   return this._id.toHexString();
