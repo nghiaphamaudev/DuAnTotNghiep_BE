@@ -7,7 +7,6 @@ import {
   forgotPassword,
   resetPassword,
   updatePassword,
-  restrictTo,
 } from '../controllers/auth.controller';
 import { uploadUserImage } from '../middlewares/uploadCloud.middleware';
 import {
@@ -39,7 +38,7 @@ userRouter.use(protect);
 /**************USER-ACTIONS****************/
 userRouter.patch('/auth/updatePassword', updatePassword);
 userRouter.patch('/deleteMe', deleteMe);
-userRouter.patch('/updateMe', restrictTo('user'), uploadUserImage, updateMe);
+userRouter.patch('/updateMe', uploadUserImage, updateMe);
 userRouter.get('/getMe', getMe, getUserById);
 
 userRouter.post('/address', addAddress);
@@ -53,7 +52,7 @@ userRouter
   .patch(removeFavoriteProduct);
 
 /**************ADMIN-USER-MANAGEMENT****************/
-userRouter.use(restrictTo('admin'));
+
 userRouter.get('/admin', getAllUser);
 userRouter.patch('/admin/:userId/toggle-block', toggleBlockUserById);
 userRouter.patch('/admin/:userId/change-user-role', changeUserRole);

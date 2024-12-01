@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { protect, restrictTo } from '../controllers/auth.controller';
+import { protect } from '../controllers/auth.controller';
 import {
   createOrder,
   getAllOrderByUserId,
