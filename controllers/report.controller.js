@@ -15,7 +15,7 @@ export const createReport = catchAsync(async (req, res, next) => {
 
 export const handleAdminReport = catchAsync(async (req, res, next) => {
   const reportId = req.params.idReport;
-  const { action, emailUser } = req.body; // 'approve' hoặc 'reject'
+  const { action, emailUser } = req.body; 
 
   if (!['Chấp nhận', 'Từ chối'].includes(action)) {
     return res.status(400).json({ message: 'Hành động không hợp lệ' });

@@ -526,7 +526,6 @@ export const changeUserRole = catchAsync(async (req, res, next) => {
 
   res.status(StatusCodes.OK).json({
     status: true,
-    message: 'Thành công',
     message: `Vai trò người dùng đã được thay đổi thành công thành ${user.role}`,
     data: user,
   });

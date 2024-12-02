@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import dotenv from 'dotenv';
 import dateFormat from 'dayjs';
 import dayjs from 'dayjs';
+import axios from 'axios';
+import moment from 'moment/moment';
 
 import querystring from 'qs';
 import config from 'config';
@@ -10,6 +12,9 @@ import { StatusCodes } from 'http-status-codes';
 import HistoryTransaction from '../models/historyTransaction.model';
 import Voucher from '../models/voucher.model';
 import { RollbackInventoryOnCancel } from '../utils/order.util';
+import { sendMailRefundCash } from '../services/email.service';
+import AppError from '../utils/appError.util';
+import User from '../models/user.model';
 
 dotenv.config();
 
@@ -17,6 +22,7 @@ const vnp_TmnCode = process.env.VNP_TMNCODE;
 const vnp_HashSecret = process.env.VNP_SECRET;
 const vnp_Url = process.env.VNP_URL;
 const vnp_ReturnUrl = process.env.VNP_RETURN_URL;
+const vnp_refundUrl = process.env.VNP_URL_REFUND;
 const vpn_IpnUrl = process.env.VPN_IPN_URL;
 
 function sortObject(obj) {
@@ -140,19 +146,23 @@ export const paymentRedirect = async (req, res, next) => {
   var signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
   if (vnp_Params['vnp_TransactionStatus'] === '00') {
+    console.log(vnp_Params);
     await Order.updateOne(
-      { code: vnp_Params['vnp_TxnRef'] },
+      { _id: vnp_Params['vnp_TxnRef'] },
       {
-        statusPayment: 'Đã thanh tóan',
+        statusPayment: 'Đã thanh toán',
       }
     );
+    const totalMoney = vnp_Params['vnp_Amount'] * 0.01;
+
     const historyTransaction = new HistoryTransaction({
       idUser: req.user.id,
+      transactionVnPayId: vnp_Params['vnp_TransactionNo'],
+      transactionVnPayDate: vnp_Params['vnp_PayDate'],
       idBill: vnp_Params['vnp_TxnRef'],
       type: 'Chuyển khoản',
-      totalMoney: vnp_Params['vnp_Amount'],
+      totalMoney: totalMoney,
       note: '',
-      status: true,
     });
     await historyTransaction.save();
   } else {
@@ -180,4 +190,148 @@ export const paymentRedirect = async (req, res, next) => {
     status: true,
     message: 'Success',
   });
+};
+function generateRequestId() {
+  const characters =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; // Các ký tự có thể dùng
+  const length = Math.floor(Math.random() * 16) + 1; // Tạo chiều dài ngẫu nhiên từ 1 đến 32
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length)); // Chọn ký tự ngẫu nhiên
+  }
+  return result;
+}
+function formatDateTime(dateString) {
+  // Tách chuỗi thành từng phần
+  const year = dateString.slice(0, 4);
+  const month = dateString.slice(4, 6);
+  const day = dateString.slice(6, 8);
+  const hour = dateString.slice(8, 10);
+  const minute = dateString.slice(10, 12);
+  const second = dateString.slice(12, 14);
+
+  // Tạo đối tượng Date
+  const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+
+  // Format ngày giờ thân thiện
+  return date.toLocaleString('vi-VN', {
+    weekday: 'long', // Hiển thị thứ
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+export const refundTransaction = async (
+  req,
+  res,
+  userId,
+  transactionId,
+  amount,
+  orderId,
+  transactionDate,
+  refundReason
+) => {
+  try {
+    const tmnCode = process.env.VNP_TMNCODE; // Mã TmnCode từ VNPAY
+    const secretKey = process.env.VNP_SECRET; // Secret key từ VNPAY
+    const vnpUrl =
+      'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction';
+
+    const requestId = generateRequestId(); // Tạo mã yêu cầu duy nhất
+    const createDate = dayjs().format('YYYYMMDDHHmmss'); // Ngày giờ hiện tại
+    let ipAddr =
+      req.headers['x-forwarded-for']?.split(',')[0] ||
+      req.connection?.remoteAddress ||
+      req.socket?.remoteAddress ||
+      '127.0.0.1';
+
+    // Kiểm tra dữ liệu đầu vào
+    if (!transactionId || !amount || !orderId) {
+      throw new Error('Thiếu dữ liệu yêu cầu bắt buộc!');
+    }
+
+    // Tạo tham số yêu cầu
+    const vnp_Params = {
+      vnp_RequestId: requestId,
+      vnp_Version: '2.1.0',
+      vnp_Command: 'refund',
+      vnp_TmnCode: tmnCode,
+      vnp_TransactionType: '02',
+      vnp_TxnRef: orderId,
+      vnp_Amount: amount * 100, // Nhân 100 theo yêu cầu API
+      vnp_TransactionNo: parseInt(transactionId),
+      vnp_TransactionDate: parseInt(transactionDate), // Thời gian giao dịch gốc
+      vnp_CreateDate: parseInt(createDate),
+      vnp_CreateBy: 'Admin',
+      vnp_IpAddr: ipAddr,
+      vnp_OrderInfo: refundReason || 'Refund transaction',
+    };
+
+    // Tạo chuỗi dữ liệu để mã hóa
+    const data = [
+      vnp_Params.vnp_RequestId,
+      vnp_Params.vnp_Version,
+      vnp_Params.vnp_Command,
+      vnp_Params.vnp_TmnCode,
+      vnp_Params.vnp_TransactionType,
+      vnp_Params.vnp_TxnRef,
+      vnp_Params.vnp_Amount,
+      vnp_Params.vnp_TransactionNo,
+      vnp_Params.vnp_TransactionDate,
+      vnp_Params.vnp_CreateBy,
+      vnp_Params.vnp_CreateDate,
+      vnp_Params.vnp_IpAddr,
+      vnp_Params.vnp_OrderInfo,
+    ].join('|');
+
+    // Tạo checksum
+    const hmac = crypto.createHmac('sha512', secretKey);
+    const checksum = hmac.update(Buffer.from(data, 'utf-8')).digest('hex');
+    vnp_Params['vnp_SecureHash'] = checksum;
+
+    // Gửi yêu cầu HTTP POST
+    const response = await axios.post(vnpUrl, vnp_Params, {
+      headers: { 'Content-Type': 'Application/json' },
+    });
+
+    // Kiểm tra phản hồi
+    if (response.data.vnp_ResponseCode === '00') {
+      const historyTransaction = new HistoryTransaction({
+        idUser: userId,
+        transactionVnPayId: response.data.vnp_TransactionNo,
+        transactionVnPayDate: response.data.vnp_PayDate,
+        idBill: orderId,
+        type: 'Chuyển khoản',
+        totalMoney: response.data.vnp_Amount * 0.01,
+        refundStatus: 'Chờ duyệt',
+        refundDetails: {
+          transactionType: 'Hoàn tiền toàn phần',
+          refundAmount: response.data.vnp_Amount * 0.01,
+          refundDate: formatDateTime(response.data.vnp_PayDate),
+          bankCode: response.data.vnp_BankCode,
+        },
+      });
+      await historyTransaction.save();
+      const user = await User.findOne({ _id: userId });
+      await sendMailRefundCash(
+        'phamnghia19022002@gmail.com',
+        user.fullName,
+        response.data.vnp_TransactionNo,
+        formatDateTime(response.data.vnp_PayDate),
+        response.data.vnp_Amount * 0.01
+      );
+
+      console.log('Gửi yêu cầu thành công!');
+    } else {
+      console.log('Hoàn tiền thất bại:', response.data);
+    }
+  } catch (error) {
+    console.log(error);
+    console.error('Lỗi hoàn tiền:', error.message);
+    throw new Error(error);
+  }
 };
