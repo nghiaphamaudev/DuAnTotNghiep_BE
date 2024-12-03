@@ -60,6 +60,9 @@ export const updateMe = catchAsync(async (req, res, next) => {
     );
   }
 
+  if (req.file) {
+    req.body.avatar = req.file.path;
+  }
   const filtedBody = filterObj(
     req.body,
     'phoneNumber',
@@ -88,28 +91,6 @@ export const updateMe = catchAsync(async (req, res, next) => {
         StatusCodes.BAD_REQUEST
       )
     );
-  }
-
-  if (
-    req.file &&
-    userCurrent.avatar !==
-      'https://res.cloudinary.com/dyv5zfnit/image/upload/v1727975620/users/user_default.jpg'
-  ) {
-    const userIdHashed = crypto
-      .createHash('sha256')
-      .update(req.user.id)
-      .digest('hex');
-
-    try {
-      await cloudinary.uploader.destroy(userIdHashed);
-    } catch (error) {
-      return next(
-        new AppError('Không thể xóa ảnh', StatusCodes.INTERNAL_SERVER_ERROR)
-      );
-    }
-    filtedBody.avatar = req.file.path;
-  } else {
-    filtedBody.avatar = userCurrent.avatar;
   }
 
   // Cập nhật thông tin người dùng
