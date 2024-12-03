@@ -107,7 +107,6 @@ export const registerSuperAdminSchema = Joi.object({
   email: emailSchema,
   password: passwordSchema,
   role: roleSchema,
-  assignedRole: assignedRoleSchema,
 });
 
 export const loginSchema = Joi.object({

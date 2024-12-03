@@ -12,13 +12,9 @@ import { uploadUserImage } from '../middlewares/uploadCloud.middleware';
 import {
   addAddress,
   addFavoriteProduct,
-  changeUserRole,
   deleteAddress,
   deleteMe,
-  deleteUserById,
-  getAllUser,
   removeFavoriteProduct,
-  toggleBlockUserById,
   updateAddress,
   updateMe,
   getMe,
@@ -50,12 +46,5 @@ userRouter
   .route('/favorite-products/:id')
   .post(addFavoriteProduct)
   .patch(removeFavoriteProduct);
-
-/**************ADMIN-USER-MANAGEMENT****************/
-
-userRouter.get('/admin', getAllUser);
-userRouter.patch('/admin/:userId/toggle-block', toggleBlockUserById);
-userRouter.patch('/admin/:userId/change-user-role', changeUserRole);
-userRouter.delete('/admin/:userId', deleteUserById);
 
 export default userRouter;

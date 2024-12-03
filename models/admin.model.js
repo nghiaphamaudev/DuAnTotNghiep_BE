@@ -27,11 +27,6 @@ const adminSchema = new mongoose.Schema({
     required: true,
     default: 'admin',
   },
-  assignedRole: {
-    type: String,
-    enum: ['manage-orders', 'manage-users', 'manage-feedback', 'all'],
-    required: true,
-  },
   coverImg: {
     type: String,
     required: true,

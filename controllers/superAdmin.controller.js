@@ -3,10 +3,37 @@ import Admin from '../models/admin.model';
 import User from '../models/user.model';
 import AppError from '../utils/appError.util';
 import catchAsync from '../utils/catchAsync.util';
+import jwt from 'jsonwebtoken';
 import {
   loginSchema,
   registerSuperAdminSchema,
 } from '../validator/user.validator';
+import { sendMaiBlockedOrder } from '../services/email.service';
+
+const signToken = (id) => {
+  return jwt.sign({ id: id }, process.env.JWT_SECRET_ADMIN, {
+    expiresIn: process.env.JWT_EXPIRES_IN,
+  });
+};
+const createSendRes = (admin, statusCode, res) => {
+  const token = signToken(admin._id);
+  const cookieOptions = {
+    expires: new Date(
+      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
+    ),
+    httpOnly: true,
+    secure: true,
+  };
+
+  res.cookie('adminJwt', token, cookieOptions);
+  admin.password = undefined;
+  res.status(statusCode).json({
+    status: true,
+    data: admin,
+    adminToken: token,
+    message: 'Thành công',
+  });
+};
 
 // Helper để lấy danh sách với phân trang
 const getPaginatedData = async (model, currentUserId = null, page, limit) => {
@@ -24,8 +51,7 @@ const getPaginatedData = async (model, currentUserId = null, page, limit) => {
 };
 
 export const createAccBySuperAdmin = catchAsync(async (req, res, next) => {
-  const { email, fullName, password, role, phoneNumber, assignedRole } =
-    req.body;
+  const { email, fullName, password, role, phoneNumber } = req.body;
 
   // Validate dữ liệu
   const { error } = registerSuperAdminSchema.validate(req.body, {
@@ -53,7 +79,7 @@ export const createAccBySuperAdmin = catchAsync(async (req, res, next) => {
   // Tạo tài khoản mới
   const newUser =
     role === 'admin' || role === 'superadmin'
-      ? { email, fullName, password, role, assignedRole }
+      ? { email, fullName, password, role }
       : { email, fullName, password, phoneNumber };
 
   await model.create(newUser);
@@ -90,11 +116,7 @@ export const loginAdmin = catchAsync(async (req, res, next) => {
         StatusCodes.FORBIDDEN
       )
     );
-  res.status(StatusCodes.OK).json({
-    status: true,
-    message: 'Đăng nhập thành công!',
-    data: admin,
-  });
+  createSendRes(admin, StatusCodes.OK, res);
 });
 
 // Xác định tài khoản mục tiêu và vai trò của tài khoản đó.
@@ -189,15 +211,29 @@ export const blockedAccBySuperAdmin = catchAsync(async (req, res, next) => {
 
 export const blockedUserAccBySuperAdmin = catchAsync(async (req, res, next) => {
   const idUser = req.params.idUser;
-  const { status } = req.body;
+  const { status, note } = req.body;
   const user = await User.findOne({ _id: idUser });
   if (!user)
     return next(
       new AppError('Tài khoản không tồn tại !', StatusCodes.BAD_REQUEST)
     );
-  console.log(user);
-  user.active = status;
-  await user.save();
+
+  if (status === false && note) {
+    user.active = status;
+    user.blockReason = note;
+    await user.save();
+    await sendMaiBlockedOrder(
+      user.email,
+      'Khoá tài khoản',
+      user.fullName,
+      note
+    );
+  } else {
+    user.active = status;
+    user.blockReason = '';
+    await user.save();
+  }
+
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'Cập nhật trạng thái thành công!',
@@ -207,18 +243,43 @@ export const blockedUserAccBySuperAdmin = catchAsync(async (req, res, next) => {
 export const updateAccountAdmin = catchAsync(async (req, res, next) => {
   const idAccount = req.params.idAdmin;
 
-  const { assignedRole, resetPassword } = req.body;
+  const { resetPassword } = req.body;
   const admin = await Admin.findOne({ _id: idAccount });
   if (!admin)
     return next(
       new AppError('Tài khoản không tồn tại !', StatusCodes.BAD_REQUEST)
     );
   if (resetPassword) admin.password = resetPassword;
-  if (assignedRole) admin.assignedRole = assignedRole;
 
   await admin.save();
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'Cập nhật thành công!',
+  });
+});
+
+export const updatePasswordManagement = catchAsync(async (req, res, next) => {
+  const { resetPassword } = req.body;
+  const admin = await Admin.findOne({ _id: req.admin._id });
+  if (!admin)
+    return next(
+      new AppError('Tài khoản không tồn tại !', StatusCodes.BAD_REQUEST)
+    );
+  if (resetPassword) admin.password = resetPassword;
+
+  await admin.save();
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Cập nhật thành công!',
+  });
+});
+
+export const getAdminById = catchAsync(async (req, res, next) => {
+  const admin = await Admin.findOne({ _id: req.admin._id });
+  if (!admin) return next(new AppError('Không tìm thấy tài khoản'));
+  return res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Lấy thành công',
+    data: admin,
   });
 });

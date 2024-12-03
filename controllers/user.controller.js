@@ -5,8 +5,8 @@ import crypto from 'crypto';
 import { StatusCodes } from 'http-status-codes';
 import cloudinary from '../configs/cloudiary.config';
 import { updateMeSchema, addAddressSchema } from '../validator/user.validator';
-import { sendMaiBlockedOrder } from '../services/email.service';
 
+import axios from 'axios';
 // Check lại mật khẩu user nhập vào có đúng mới xóa
 export const deleteMe = catchAsync(async (req, res, next) => {
   const userId = req.user.id;
@@ -39,10 +39,9 @@ const filterObj = (obj, ...allowedFiels) => {
 };
 
 export const updateMe = catchAsync(async (req, res, next) => {
-  // req.file.path = https://res.cloudinary.com/dyv5zfnit/image/upload/v1728037423/users/5270ef936a2391329b3f3c0ee37b8f1190b06aae01d203640072aa1285540132.jpg
-
   const { phoneNumber, fullName, gender } = req.body;
-  //Validate từ form
+
+  // Validate từ form
   const { error } = updateMeSchema.validate(
     { phoneNumber, fullName, gender },
     { abortEarly: false }
@@ -51,14 +50,16 @@ export const updateMe = catchAsync(async (req, res, next) => {
     const messages = error.details.map((item) => item.message);
     return res.status(StatusCodes.BAD_REQUEST).json({ messages });
   }
+
   if (req.body.password || req.body.passwordConfirm) {
     return next(
       new AppError(
-        ' Không cho phép cập nhật mật khẩu. Vui lòng thử với chức năng cập nhật mật khẩu!',
+        'Không cho phép cập nhật mật khẩu. Vui lòng thử với chức năng cập nhật mật khẩu!',
         StatusCodes.NOT_FOUND
       )
     );
   }
+
   const filtedBody = filterObj(
     req.body,
     'phoneNumber',
@@ -67,11 +68,28 @@ export const updateMe = catchAsync(async (req, res, next) => {
     'gender'
   );
   const userCurrent = await User.findById(req.user.id);
+
+  // Kiểm tra xem người dùng có tồn tại không
   if (!userCurrent) {
     return next(
       new AppError('Người dùng không tồn tại', StatusCodes.UNAUTHORIZED)
     );
   }
+
+  // Kiểm tra xem số điện thoại đã tồn tại trong database (ngoại trừ người dùng hiện tại)
+  const existedPhone = await User.findOne({
+    phoneNumber: phoneNumber,
+    _id: { $ne: req.user.id },
+  });
+  if (existedPhone) {
+    return next(
+      new AppError(
+        'Số điện thoại này đã được sử dụng bởi tài khoản khác',
+        StatusCodes.BAD_REQUEST
+      )
+    );
+  }
+
   if (
     req.file &&
     userCurrent.avatar !==
@@ -94,6 +112,7 @@ export const updateMe = catchAsync(async (req, res, next) => {
     filtedBody.avatar = userCurrent.avatar;
   }
 
+  // Cập nhật thông tin người dùng
   const updated = await User.findByIdAndUpdate(req.user.id, filtedBody, {
     new: true,
     runValidators: true,
@@ -383,8 +402,6 @@ export const getAllUser = catchAsync(async (req, res, next) => {
   });
 });
 
-import axios from 'axios';
-
 export const getUserById = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.params.userId);
   if (!user)
@@ -459,75 +476,6 @@ export const getUserById = catchAsync(async (req, res, next) => {
       updatedAt: user.updatedAt,
       addresses,
     },
-  });
-});
-
-export const toggleBlockUserById = catchAsync(async (req, res, next) => {
-  const userId = req.params.userId;
-  const { shouldBlock, note } = req.body;
-
-  const user = await User.findById(userId);
-
-  if (!user) {
-    return next(
-      new AppError('Người dùng không tồn tại!', StatusCodes.NOT_FOUND)
-    );
-  }
-
-  if (note && shouldBlock === false) {
-    user.active = shouldBlock;
-    user.blockReason = note;
-    try {
-      await user.save();
-    } catch (err) {
-      console.error('Error saving user:', err);
-      return next(
-        new AppError(
-          'Lỗi lưu thông tin người dùng!',
-          StatusCodes.INTERNAL_SERVER_ERROR
-        )
-      );
-    }
-
-    await sendMaiBlockedOrder(
-      user.email,
-      'Khoá tài khoản',
-      user.fullName,
-      note
-    );
-  } else {
-    user.active = shouldBlock;
-    user.blockReason = '';
-    await user.save();
-  }
-
-  res.status(StatusCodes.OK).json({
-    status: true,
-    message: shouldBlock
-      ? 'Người dùng đã bị chặn thành công'
-      : 'Người dùng đã được bỏ chặn thành công',
-    data: user,
-  });
-});
-
-export const changeUserRole = catchAsync(async (req, res, next) => {
-  const userId = req.params.userId;
-
-  const user = await User.findById(userId);
-  if (!user) {
-    return next(
-      new AppError('Người dùng không tồn tại!', StatusCodes.NOT_FOUND)
-    );
-  }
-
-  // Chuyển đổi vai trò người dùng
-  user.role = user.role === 'admin' ? 'user' : 'admin';
-  await user.save();
-
-  res.status(StatusCodes.OK).json({
-    status: true,
-    message: `Vai trò người dùng đã được thay đổi thành công thành ${user.role}`,
-    data: user,
   });
 });
 
