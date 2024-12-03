@@ -258,6 +258,7 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
   // Xử lý dữ liệu từng sản phẩm trong orderItems
   const orderDetails = await Promise.all(
     order.orderItems.map(async (item) => {
+      console.log(item);
       const product = item.productId;
 
       if (!product) {
@@ -287,9 +288,9 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
         color: variant.color,
         image: variant.images[0], // Bạn có thể thay đổi cách hiển thị ảnh nếu cần
         size: size.nameSize,
-        price: size.price,
+        price: item.price,
         quantity: item.quantity,
-        totalItemPrice: size.price * item.quantity,
+        totalItemPrice: item.price * item.quantity,
       };
     })
   );
