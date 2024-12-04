@@ -8,6 +8,7 @@ import {
   relatedProduct,
   updateProduct,
   getDetailProductBySlug,
+  updateVariantStatusById,
 } from '../controllers/product.controller';
 
 import { uploadProductImages } from '../middlewares/uploadCloud.middleware';
@@ -22,5 +23,6 @@ productRouter.put('/:id', uploadProductImages, updateProduct);
 productRouter.delete('/:id', deleteProduct);
 productRouter.get('/:categoryId/related/:productId', relatedProduct);
 productRouter.patch('/:id/status', deleteProductStatus);
+productRouter.patch('/:id/update-variants-status/:variantId', updateVariantStatusById);
 
 export default productRouter;
