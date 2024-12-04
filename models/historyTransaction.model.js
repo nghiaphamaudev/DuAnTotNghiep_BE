@@ -12,7 +12,7 @@ const historyTransactionSchema = new mongoose.Schema(
       required: true,
     },
     transactionVnPayId: { type: String, required: false },
-    transactionVnPayDate: { type: Number, required: true },
+    transactionVnPayDate: { type: Number, required: false },
     transCode: {
       //lấy từ order
       type: String,
@@ -34,7 +34,6 @@ const historyTransactionSchema = new mongoose.Schema(
       // Trạng thái hoàn tiền
       type: String,
       enum: ['Chưa hoàn trả', 'Đã hoàn trả', 'Chờ duyệt'],
-      default: 'Chờ duyệt', // Mặc định là chưa hoàn tiền
     },
     refundDetails: {
       // Chi tiết về giao dịch hoàn tiền
@@ -44,10 +43,9 @@ const historyTransactionSchema = new mongoose.Schema(
       },
       refundAmount: {
         type: Number, // Số tiền đã hoàn lại
-        default: 0,
       },
       refundDate: {
-        type: Date, // Ngày thực hiện hoàn tiền
+        type: String, // Ngày thực hiện hoàn tiền
       },
       bankCode: {
         type: String,

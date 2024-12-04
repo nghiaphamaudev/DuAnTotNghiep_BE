@@ -161,16 +161,6 @@ export const createOrder = catchAsync(async (req, res, next) => {
     });
     await order.save({ session });
 
-    const historyBill = new HistoryBill({
-      userId: userId,
-      idBill: order.id,
-      creator: req.user.fullName,
-      role: req.user.role,
-      statusBill: 'Chờ xác nhận',
-      note: '',
-    });
-    await historyBill.save({ session });
-
     if (paymentMethod === 'VNPAY') {
       const urlPayment = createPaymentUrl(
         req,
@@ -188,6 +178,16 @@ export const createOrder = catchAsync(async (req, res, next) => {
         data: { paymentUrl: urlPayment },
       });
     }
+    const historyBill = new HistoryBill({
+      userId: userId,
+      idBill: order.id,
+      creator: req.user.fullName,
+      role: req.user.role,
+      statusBill: 'Chờ xác nhận',
+      note: '',
+    });
+
+    await historyBill.save({ session });
 
     await updateCartAfterOrder(userId, orderItems);
 
@@ -261,6 +261,7 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
   // Xử lý dữ liệu từng sản phẩm trong orderItems
   const orderDetails = await Promise.all(
     order.orderItems.map(async (item) => {
+      console.log(item);
       const product = item.productId;
 
       if (!product) {
@@ -290,9 +291,9 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
         color: variant.color,
         image: variant.images[0], // Bạn có thể thay đổi cách hiển thị ảnh nếu cần
         size: size.nameSize,
-        price: size.price,
+        price: item.price,
         quantity: item.quantity,
-        totalItemPrice: size.price * item.quantity,
+        totalItemPrice: item.price * item.quantity,
       };
     })
   );
@@ -380,7 +381,7 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     );
   }
 
-  if (status === 'Đã hủy' || status === 'Hoàn đơn') {
+  if (status === 'Đã hủy') {
     try {
       // Cập nhật trạng thái đơn hàng
       updateOrder.status = status;
@@ -393,8 +394,7 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
       if (updateOrder.discountVoucher) {
         await rollbackVoucherOnCancel(updateOrder.discountCode, next);
       }
-
-      // Nếu có lịch sử giao dịch, tiến hành hoàn tiền
+      // Chỉ hoàn tiền nếu có lịch sử giao dịch
       if (historyTransaction) {
         const idBill = historyTransaction.idBill.toString();
         await refundTransaction(
@@ -404,11 +404,54 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
           historyTransaction.transactionVnPayId,
           historyTransaction.totalMoney,
           idBill,
-          historyTransaction.transactionVnPayDate
+          historyTransaction.transactionVnPayDate,
+          'all'
         );
       }
     } catch (error) {
       // Xử lý lỗi rollback kho hàng hoặc voucher
+      return next(
+        new AppError(
+          'Không thể rollback số lượng sản phẩm hoặc xử lý giao dịch.',
+          StatusCodes.INTERNAL_SERVER_ERROR
+        )
+      );
+    }
+  }
+
+  if (status === 'Hoàn đơn') {
+    try {
+      // Cập nhật trạng thái đơn hàng
+      updateOrder.status = status;
+      updateOrder.statusShip = statusShip;
+      await updateOrder.save();
+
+      // Rollback kho hàng
+      await RollbackInventoryOnCancel(updateOrder.orderItems);
+
+      // Rollback voucher nếu có
+      if (updateOrder.discountVoucher) {
+        await rollbackVoucherOnCancel(updateOrder.discountCode, next);
+      }
+      // Chỉ hoàn tiền nếu có lịch sử giao dịch
+      if (historyTransaction) {
+        const idBill = historyTransaction.idBill.toString();
+        const totalMoney =
+          historyTransaction.totalMoney - updateOrder.shippingCost * 2;
+        console.log(totalMoney);
+        await refundTransaction(
+          req,
+          res,
+          historyTransaction.idUser.toString(),
+          historyTransaction.transactionVnPayId,
+          totalMoney,
+          idBill,
+          historyTransaction.transactionVnPayDate,
+          'part'
+        );
+      }
+    } catch (error) {
+      console.log(error);
       return next(
         new AppError(
           'Không thể rollback số lượng sản phẩm hoặc xử lý giao dịch.',
@@ -453,6 +496,17 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
       updateOrder.paymentMethod,
       updateOrder.totalPrice
     );
+
+    const historyTransaction = new HistoryTransaction({
+      idUser: req.user.id,
+      idBill: id,
+      totalMoney: updateOrder.totalCost,
+      note: '',
+      status: true,
+    });
+    updateOrder.status = status;
+    await updateOrder.save();
+    await historyTransaction.save();
   }
 
   const orderDetails = await Promise.all(
@@ -500,26 +554,14 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
   }
 
   if (status === 'Đã nhận được hàng') {
-    await Promise.all(
-      updateOrder.orderItems.map(async (item) => {
-        const product = await Product.findById(item.productId);
-        if (!product) return;
+    const bulkOperations = updateOrder.orderItems.map((item) => ({
+      updateOne: {
+        filter: { _id: item.productId },
+        update: { $inc: { saleCount: item.quantity } },
+      },
+    }));
 
-        product.saleCount += item.quantity;
-        await product.save();
-      })
-    );
-
-    const historyTransaction = new HistoryTransaction({
-      idUser: req.user.id,
-      idBill: id,
-      totalMoney: updateOrder.totalCost,
-      note: '',
-      status: true,
-    });
-    updateOrder.status = status;
-    await updateOrder.save();
-    await historyTransaction.save();
+    await Product.bulkWrite(bulkOperations);
   }
 
   const historyBill = new HistoryBill({

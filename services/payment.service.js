@@ -15,6 +15,7 @@ import { RollbackInventoryOnCancel } from '../utils/order.util';
 import { sendMailRefundCash } from '../services/email.service';
 import AppError from '../utils/appError.util';
 import User from '../models/user.model';
+import HistoryBill from '../models/historyBill.model';
 
 dotenv.config();
 
@@ -164,13 +165,19 @@ export const paymentRedirect = async (req, res, next) => {
       totalMoney: totalMoney,
       note: '',
     });
+    const historyBill = new HistoryBill({
+      userId: req.user.id,
+      idBill: vnp_Params['vnp_TxnRef'],
+      creator: req.user.fullName,
+      role: req.user.role,
+      statusBill: 'Chờ xác nhận',
+      note: '',
+    });
+    await historyBill.save();
     await historyTransaction.save();
   } else {
-    const updatedOrder = await Order.updateOne(
-      { _id: vnp_Params['vnp_TxnRef'] },
-      { status: 'Đã hủy' }
-    );
-    updatedOrder.status = status;
+    const updatedOrder = await Order.findOne({ _id: vnp_Params['vnp_TxnRef'] });
+    updatedOrder.status = 'Đã hủy';
     await updatedOrder.save();
     await RollbackInventoryOnCancel(updatedOrder.orderItems);
 
@@ -185,6 +192,16 @@ export const paymentRedirect = async (req, res, next) => {
         await voucher.save();
       }
     }
+
+    const historyBill = new HistoryBill({
+      userId: req.user.id,
+      idBill: vnp_Params['vnp_TxnRef'],
+      creator: req.user.fullName,
+      role: req.user.role,
+      statusBill: 'Đã hủy',
+      note: 'Khách hủy thanh toán',
+    });
+    await historyBill.save();
   }
   res.status(StatusCodes.OK).json({
     status: true,
@@ -233,6 +250,7 @@ export const refundTransaction = async (
   amount,
   orderId,
   transactionDate,
+  type,
   refundReason
 ) => {
   try {
@@ -253,6 +271,7 @@ export const refundTransaction = async (
     if (!transactionId || !amount || !orderId) {
       throw new Error('Thiếu dữ liệu yêu cầu bắt buộc!');
     }
+    const kind = type === 'part' ? '03' : '02';
 
     // Tạo tham số yêu cầu
     const vnp_Params = {
@@ -260,7 +279,7 @@ export const refundTransaction = async (
       vnp_Version: '2.1.0',
       vnp_Command: 'refund',
       vnp_TmnCode: tmnCode,
-      vnp_TransactionType: '02',
+      vnp_TransactionType: kind,
       vnp_TxnRef: orderId,
       vnp_Amount: amount * 100, // Nhân 100 theo yêu cầu API
       vnp_TransactionNo: parseInt(transactionId),
@@ -309,7 +328,9 @@ export const refundTransaction = async (
         totalMoney: response.data.vnp_Amount * 0.01,
         refundStatus: 'Chờ duyệt',
         refundDetails: {
-          transactionType: 'Hoàn tiền toàn phần',
+          transactionType: `Hoàn tiền ${
+            kind === '02' ? 'toàn phần' : 'một phần'
+          }`,
           refundAmount: response.data.vnp_Amount * 0.01,
           refundDate: formatDateTime(response.data.vnp_PayDate),
           bankCode: response.data.vnp_BankCode,

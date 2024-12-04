@@ -126,6 +126,7 @@ export async function RollbackInventoryOnCancel(orderItems) {
 
     await session.commitTransaction();
   } catch (error) {
+    console.log(error);
     await session.abortTransaction();
     return next(error);
   } finally {
