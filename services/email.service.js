@@ -335,3 +335,111 @@ export const sendMailDelivered = async (
     throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
   }
 };
+
+export const sendMailRefundCash = async (
+  to,
+  userName,
+  transactionId,
+  transactionDate,
+  refundAmount
+) => {
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USERNAME, // địa chỉ email người gửi
+      to: to, // địa chỉ email người nhận
+      subject: 'Hoàn trả tiền', // tiêu đề email // nội dung email
+      html: `
+          <!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thông báo hoàn tiền</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    h2 {
+      color: #333;
+      text-align: center;
+    }
+    p {
+      color: #555;
+      line-height: 1.6;
+    }
+    .footer {
+      text-align: center;
+      font-size: 14px;
+      color: #888;
+      margin-top: 20px;
+    }
+    .highlight {
+      color: #28a745;
+      font-weight: bold;
+    }
+    .button {
+      display: inline-block;
+      background-color: #28a745;
+      color: #fff;
+      padding: 10px 20px;
+      text-decoration: none;
+      border-radius: 4px;
+      margin-top: 20px;
+      text-align: center;
+    }
+    .button:hover {
+      background-color: #218838;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>Thông báo hoàn tiền</h2>
+
+    <p>Chào bạn <strong>${userName}</strong>,</p>
+
+    <p>Chúng tôi muốn thông báo rằng yêu cầu hoàn tiền của bạn đang được xử lí. Sau khi xác minh giao dịch, số tiền <span class="highlight">${refundAmount} VNĐ</span> sẽ được hoàn lại vào phương thức thanh toán của bạn trong khoảng 1 - 2 ngày.</p>
+
+    <p>Thông tin giao dịch hoàn tiền:</p>
+    <ul>
+      <li><strong>Mã giao dịch:</strong> ${transactionId}</li>
+      <li><strong>Ngày giao dịch:</strong> ${transactionDate}</li>
+      <li><strong>Phương thức thanh toán:</strong> Chuyển khoản NCB</li>
+    </ul>
+
+    <p>Chúng tôi hy vọng bạn sẽ tiếp tục sử dụng dịch vụ của chúng tôi. Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với bộ phận hỗ trợ khách hàng.</p>
+
+    <p>Cảm ơn bạn đã tin tưởng sử dụng dịch vụ của chúng tôi.</p>
+
+    <a href="{{supportLink}}" class="button">Liên hệ với chúng tôi</a>
+
+    <div class="footer">
+      <p>Trân trọng,<br>Đội ngũ hỗ trợ khách hàng</p>
+    </div>
+  </div>
+
+</body>
+</html>
+
+        `,
+    };
+    await transporter.sendMail(mailOptions);
+    console.log('Email đã được gửi:');
+  } catch (error) {
+    console.error('Lỗi khi gửi email:', error);
+    throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
+  }
+};

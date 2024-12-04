@@ -12,7 +12,7 @@ const feedbackSchema = new mongoose.Schema(
       required: true,
       ref: 'Product',
     },
-    classify: { type: String, required: true },
+    classify: { type: Boolean, default: true },
     rating: { type: Number, required: true },
     comment: { type: String, required: false, default: '' },
     images: [String], //mở rộng

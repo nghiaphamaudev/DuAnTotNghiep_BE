@@ -28,12 +28,12 @@ const cartItemSchema = new mongoose.Schema(
 );
 
 // Trường ảo tính tổng tiền cho mỗi sản phẩm trong giỏ hàng
-cartItemSchema.virtual('totalItemPrice').get(function () {
-  if (this.productId && this.productId.price) {
-    return this.quantity * this.productId.price;
-  }
-  return 0;
-});
+// cartItemSchema.virtual('totalItemPrice').get(function () {
+//   if (this.productId && this.productId.price) {
+//     return this.quantity * this.productId.price;
+//   }
+//   return 0;
+// });
 
 cartItemSchema.virtual('id').get(function () {
   return this._id.toHexString();
