@@ -158,7 +158,6 @@ export const protect = catchAsync(async (req, res, next) => {
 });
 
 //Hạn chế quyền
-
 //Validate email nhập bởi user
 //Tìm email user có tồn tại chưa
 //Tạo resetToken và gửi cho user , băm resetToken lưu vào db
