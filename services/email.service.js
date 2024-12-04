@@ -410,8 +410,8 @@ export const sendMailRefundCash = async (
     <h2>Thông báo hoàn tiền</h2>
 
     <p>Chào bạn <strong>${userName}</strong>,</p>
-
     <p>Chúng tôi muốn thông báo rằng yêu cầu hoàn tiền của bạn đang được xử lí. Sau khi xác minh giao dịch, số tiền <span class="highlight">${refundAmount} VNĐ</span> sẽ được hoàn lại vào phương thức thanh toán của bạn trong khoảng 1 - 2 ngày.</p>
+
 
     <p>Thông tin giao dịch hoàn tiền:</p>
     <ul>
