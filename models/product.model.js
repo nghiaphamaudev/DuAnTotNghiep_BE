@@ -10,10 +10,7 @@ const sizeSchema = new mongoose.Schema(
     inventory: { type: Number, required: true, min: 0 },
     status: {
       type: Boolean,
-      required: true, // Đảm bảo trường status luôn có giá trị
-      default: function () {
-        return this.inventory >= 0; // Nếu inventory > 0 thì status là true, nếu không thì false
-      },
+      default: true
     },
   },
   {
@@ -31,12 +28,6 @@ const sizeSchema = new mongoose.Schema(
     },
   }
 );
-
-// Hook pre-save để cập nhật `status` dựa trên `inventory`
-sizeSchema.pre('save', function (next) {
-  this.status = this.inventory >= 0; // Nếu inventory > 0, status là true
-  next();
-});
 
 const variantSchema = new mongoose.Schema(
   {
@@ -46,10 +37,8 @@ const variantSchema = new mongoose.Schema(
     sizes: [sizeSchema],
     status: {
       type: Boolean,
-      default: function () {
-        // Kiểm tra tất cả size trong variant có hết hàng không
-        return this.sizes.some((size) => size.status === true); // Chỉ cần một size có status là true
-      },
+      default: true,
+      required: true
     },
   },
   {
@@ -68,11 +57,6 @@ const variantSchema = new mongoose.Schema(
   }
 );
 
-// Hook pre-save để cập nhật status của variant dựa trên sizes
-variantSchema.pre('save', function (next) {
-  this.status = this.sizes.some((size) => size.status === true); // Nếu có size nào có status = true thì variant status = true
-  next();
-});
 
 const productSchema = new mongoose.Schema(
   {

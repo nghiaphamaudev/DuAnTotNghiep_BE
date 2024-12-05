@@ -8,7 +8,7 @@ import {
   relatedProduct,
   updateProduct,
   getDetailProductBySlug,
-  updateVariantStatusById,
+  toggleVariantStatus,
 } from '../controllers/product.controller';
 import { restrictTo } from '../controllers/auth.controller';
 import { uploadProductImages } from '../middlewares/uploadCloud.middleware';
@@ -23,6 +23,6 @@ productRouter.put('/:id', uploadProductImages, updateProduct);
 productRouter.delete('/:id', deleteProduct);
 productRouter.get('/:categoryId/related/:productId', relatedProduct);
 productRouter.patch('/:id/status', deleteProductStatus);
-productRouter.patch('/:id/update-variants-status/:variantId', updateVariantStatusById);
+productRouter.put('/:productId/variant/:variantId', toggleVariantStatus)
 
 export default productRouter;

@@ -178,32 +178,20 @@ export const getAllFeedbacks = catchAsync(async (req, res) => {
 
 
 export const deleteFeedbackstStatus = async (req, res, next) => {
-    try {
-        const { feedbackId } = req.params;
-        console.log('Received ID:', feedbackId);
-        const feedback = await Feedback.findById(feedbackId)
-        console.log('ID 2', feedback);
-        if (!feedback) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'Không tìm thấy feedback với ID được cung cấp',
-            });
-        }
-
-        feedback.classify = !feedback.classify;
-        await feedback.save();
-
-        res.status(200).json({
-            status: 'success',
-            data: {
-                feedbackId: feedback._id,
-                classify: feedback.classify,
-            },
-        });
-    } catch (error) {
-        console.error(error);
-        next(error);
+    const { feedbackId } = req.params;
+    const feedback = await Feedback.findById(feedbackId);
+    if (!feedback) {
+        return next(new AppError(' not found', 404));
     }
+    feedback.classify = !feedback.classify;
+    await feedback.save();
+    res.status(200).json({
+        status: 'success',
+        data: {
+            id: feedback.feedbackId,
+            classify: feedback.classify,
+        },
+    });
 };
 
 

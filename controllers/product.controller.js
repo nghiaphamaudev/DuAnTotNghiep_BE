@@ -1,10 +1,11 @@
 import Product from '../models/product.model';
-import { StatusCodes } from 'http-status-codes';
+import { OK, StatusCodes } from 'http-status-codes';
 import catchAsync from '../utils/catchAsync.util';
 import AppError from '../utils/appError.util';
 import slugify from 'slugify';
 import { cloudinaryDelete } from '../middlewares/uploadCloud.middleware';
 import mongoose from 'mongoose';
+import Cart from '../models/cart.model';
 
 
 
@@ -78,7 +79,7 @@ export const createProduct = catchAsync(async (req, res, next) => {
 export const getAllProducts = catchAsync(async (req, res) => {
   const {
     _page = 1,
-    _limit = 10,
+    _limit = 40,
     _sort = 'createdAt',
     _order = 'asc',
   } = req.query;
@@ -256,6 +257,49 @@ export const updateProduct = catchAsync(async (req, res, next) => {
 
 
 
+export const toggleVariantStatus = catchAsync(async (req, res, next) => {
+  const { productId, variantId } = req.params;
+  const product = await Product.findOne({ _id: productId, 'variants._id': variantId });
+  if (!product) {
+    return next(new AppError('Sản phẩm không tồn tại hoặc biến thể không tồn tại', StatusCodes.NOT_FOUND));
+  }
+  const variant = product.variants.find(v => v._id.toString() === variantId);
+  if (variant) {
+    const newStatus = variant.status === true ? false : true;
+    await Product.findOneAndUpdate(
+      { _id: productId, 'variants._id': variantId },
+      {
+        $set: {
+          'variants.$.status': newStatus,
+        },
+      },
+      { new: true }
+    );
+    const updatedProduct = await Product.findById(productId);
+    const updatedVariant = updatedProduct.variants.find(v => v._id.toString() === variantId);
+    if (!updatedVariant.status) {
+      await Cart.updateMany(
+        { 'items.variantId': variantId },
+        { $pull: { items: { variantId: variantId } } }
+      );
+      console.log(`Biến thể ${variantId} đã được xóa khỏi giỏ hàng`);
+    }
+
+    res.status(StatusCodes.OK).json({
+      status: 'OK',
+      message: `Trạng thái biến thể đã được đổi thành ${updatedVariant.status ? 'true' : 'false'}`,
+    });
+  }
+});
+
+
+
+
+
+
+
+
+
 
 //gợi ý sản phẩm theo danh mục
 export const relatedProduct = catchAsync(async (req, res, next) => {
@@ -304,33 +348,7 @@ export const deleteProductStatus = async (req, res, next) => {
 };
 
 
-export const updateVariantStatusById = async (req, res, next) => {
-  const { id, variantId } = req.params;
-  const product = await Product.findById(id);
 
-  if (!product) {
-    return next(new AppError('Product not found', 404));
-  }
-  const variant = product.variants.find(
-    (v) => v.id.toString() === variantId.toString()
-  );
-  if (!variant) {
-    return next(new AppError('Variant not found', 404));
-  }
-  variant.status = !variant.status;
-  await product.save();
-  res.status(200).json({
-    status: 'success',
-    data: {
-      id: product._id,
-      variant: {
-        id: variant.id,
-        color: variant.color,
-        status: variant.status,
-      },
-    },
-  });
-};
 
 
 
