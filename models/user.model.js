@@ -62,6 +62,10 @@ const userSchema = new mongoose.Schema(
       required: true,
       default: 'Khác',
     },
+    blockReason: {
+      type: String,
+      required: false,
+    },
     avatar: {
       type: String,
       default:
@@ -69,7 +73,6 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['admin', 'user'],
       default: 'user',
     },
     rank: {

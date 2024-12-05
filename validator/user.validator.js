@@ -90,6 +90,10 @@ const genderSchema = Joi.string()
     'string.empty': 'Giới tính không được để trống',
     'any.required': 'Giới tính là bắt buộc',
   });
+const roleSchema = Joi.string().valid('admin', 'superadmin', 'user').required();
+const assignedRoleSchema = Joi.string()
+  .valid('manage-orders', 'manage-users', 'manage-feedback', 'all')
+  .required();
 
 export const registerSchema = Joi.object({
   fullName: fullNameSchema,
@@ -97,6 +101,12 @@ export const registerSchema = Joi.object({
   password: passwordSchema,
   passwordConfirm: confirmPasswordSchema,
   phoneNumber: phoneNumberSchema,
+});
+export const registerSuperAdminSchema = Joi.object({
+  fullName: fullNameSchema,
+  email: emailSchema,
+  password: passwordSchema,
+  role: roleSchema,
 });
 
 export const loginSchema = Joi.object({

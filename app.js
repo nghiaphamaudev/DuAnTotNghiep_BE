@@ -15,6 +15,9 @@ import paymentRouter from './routes/payment.route.js';
 import billRouter from './routes/bill.route.js';
 import feedbackRouter from './routes/feedback.router.js';
 import voucherRouter from './routes/voucher.route.js';
+import adminRouter from './routes/admin.route.js';
+import reportRouter from './routes/report.route.js';
+import statementRouter from './routes/statement.route.js';
 
 const app = express();
 app.use(cors());
@@ -42,6 +45,9 @@ app.use('/api/v1/bills', billRouter);
 app.use('/api/v1/feedback', feedbackRouter);
 
 app.use('/api/v1/vouchers', voucherRouter);
+app.use('/api/v1/superadmins', adminRouter);
+app.use('/api/v1/reports', reportRouter);
+app.use('/api/v1/statements', statementRouter);
 app.all('*', (req, res, next) => {
   return next(
     new AppError(

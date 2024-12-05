@@ -68,6 +68,7 @@ const productSchema = new mongoose.Schema(
     orderQuantity: { type: Number, default: 0 },
     ratingQuantity: { type: Number, default: 0 },
     description: { type: String, required: true },
+    saleCount: { type: Number, default: 0 },
     isActive: {
       type: Boolean,
       default: true,

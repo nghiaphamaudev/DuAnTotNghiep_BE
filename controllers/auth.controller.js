@@ -158,20 +158,6 @@ export const protect = catchAsync(async (req, res, next) => {
 });
 
 //Hạn chế quyền
-export const restrictTo = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return next(
-        new AppError(
-          'Bạn không có quyền thực hiện hành động này!',
-          StatusCodes.FORBIDDEN
-        )
-      );
-    }
-    next();
-  };
-};
-
 //Validate email nhập bởi user
 //Tìm email user có tồn tại chưa
 //Tạo resetToken và gửi cho user , băm resetToken lưu vào db

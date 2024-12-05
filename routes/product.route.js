@@ -10,7 +10,7 @@ import {
   getDetailProductBySlug,
   toggleVariantStatus,
 } from '../controllers/product.controller';
-import { restrictTo } from '../controllers/auth.controller';
+
 import { uploadProductImages } from '../middlewares/uploadCloud.middleware';
 
 const productRouter = Router();
