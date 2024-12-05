@@ -15,7 +15,7 @@ export const getTop5CustomersByDay = catchAsync(async (req, res, next) => {
     {
       $match: {
         createdAt: { $gte: todayStart, $lte: todayEnd }, // Lọc đơn hàng trong ngày hôm nay
-        status: { $in: ['Đã nhận hàng', 'Đã giao hàng'] }, // Lọc theo trạng thái đơn hàng
+        status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] }, // Lọc theo trạng thái đơn hàng
       },
     },
     {
@@ -33,7 +33,7 @@ export const getTop5CustomersByDay = catchAsync(async (req, res, next) => {
       $sort: { totalAmount: -1 }, // Sắp xếp theo tổng giá trị đơn hàng giảm dần
     },
     {
-      $limit: 5, // Lấy top 5 khách hàng
+      $limit: 3, // Lấy top 5 khách hàng
     },
     {
       $lookup: {
@@ -83,7 +83,7 @@ export const getTop5CustomersByWeek = catchAsync(async (req, res, next) => {
     {
       $match: {
         createdAt: { $gte: weekStart, $lte: weekEnd }, // Lọc đơn hàng trong tuần hiện tại
-        status: { $in: ['Đã nhận hàng', 'Đã giao hàng'] }, // Lọc theo trạng thái đơn hàng
+        status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] }, // Lọc theo trạng thái đơn hàng
       },
     },
     {
@@ -101,7 +101,7 @@ export const getTop5CustomersByWeek = catchAsync(async (req, res, next) => {
       $sort: { totalAmount: -1 }, // Sắp xếp theo tổng giá trị đơn hàng giảm dần
     },
     {
-      $limit: 5, // Lấy top 5 khách hàng
+      $limit: 3, // Lấy top 5 khách hàng
     },
     {
       $lookup: {
@@ -133,19 +133,23 @@ export const getTop5CustomersByWeek = catchAsync(async (req, res, next) => {
 });
 
 export const getTop5CustomersByMonth = catchAsync(async (req, res, next) => {
+  // Lấy ngày hiện tại
   const today = new Date();
-  const currentMonth = today.getMonth(); // Lấy tháng hiện tại (từ 0 đến 11)
-  const currentYear = today.getFullYear(); // Lấy năm hiện tại
 
-  // Đặt thời gian bắt đầu của tháng
-  const todayStart = new Date(currentYear, currentMonth, 1, 0, 0, 0, 0); // Ngày đầu tháng
-  // Đặt thời gian kết thúc của tháng
-  const todayEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999); // Ngày cuối tháng
+  // Tính ngày đầu tháng
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1); // Ngày đầu tiên của tháng
+  monthStart.setHours(0, 0, 0, 0); // Đặt thời gian bắt đầu của ngày đầu tháng
 
+  // Tính ngày cuối tháng
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Ngày cuối cùng của tháng
+  monthEnd.setHours(23, 59, 59, 999); // Đặt thời gian kết thúc của ngày cuối tháng
+
+  // Lọc và nhóm đơn hàng theo tháng
   const result = await Order.aggregate([
     {
       $match: {
-        createdAt: { $gte: todayStart, $lte: todayEnd }, // Lọc đơn hàng trong tháng hiện tại
+        createdAt: { $gte: monthStart, $lte: monthEnd }, // Lọc đơn hàng trong tháng hiện tại
+        status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] }, // Lọc theo trạng thái đơn hàng
       },
     },
     {
@@ -153,7 +157,7 @@ export const getTop5CustomersByMonth = catchAsync(async (req, res, next) => {
     },
     {
       $group: {
-        _id: '$userId', // Gộp theo ID người dùng (giả sử bạn có trường `userId` trong order)
+        _id: '$userId', // Gộp theo ID người dùng
         totalAmount: {
           $sum: { $multiply: ['$orderItems.quantity', '$orderItems.price'] }, // Tổng giá trị đơn hàng
         },
@@ -163,7 +167,7 @@ export const getTop5CustomersByMonth = catchAsync(async (req, res, next) => {
       $sort: { totalAmount: -1 }, // Sắp xếp theo tổng giá trị đơn hàng giảm dần
     },
     {
-      $limit: 5, // Lấy top 5 khách hàng
+      $limit: 3, // Lấy top 5 khách hàng
     },
     {
       $lookup: {
@@ -195,18 +199,23 @@ export const getTop5CustomersByMonth = catchAsync(async (req, res, next) => {
 });
 
 export const getTop5CustomersByYear = catchAsync(async (req, res, next) => {
+  // Lấy ngày hiện tại
   const today = new Date();
-  const currentYear = today.getFullYear(); // Lấy năm hiện tại
 
-  // Đặt thời gian bắt đầu của năm
-  const yearStart = new Date(currentYear, 0, 1, 0, 0, 0, 0); // Ngày đầu năm
-  // Đặt thời gian kết thúc của năm
-  const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59, 999); // Ngày cuối năm
+  // Tính ngày đầu năm
+  const yearStart = new Date(today.getFullYear(), 0, 1); // Ngày đầu tiên của năm
+  yearStart.setHours(0, 0, 0, 0); // Đặt thời gian bắt đầu của ngày đầu năm
 
+  // Tính ngày cuối năm
+  const yearEnd = new Date(today.getFullYear(), 11, 31); // Ngày cuối cùng của năm
+  yearEnd.setHours(23, 59, 59, 999); // Đặt thời gian kết thúc của ngày cuối năm
+
+  // Lọc và nhóm đơn hàng theo năm
   const result = await Order.aggregate([
     {
       $match: {
         createdAt: { $gte: yearStart, $lte: yearEnd }, // Lọc đơn hàng trong năm hiện tại
+        status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] }, // Lọc theo trạng thái đơn hàng
       },
     },
     {
@@ -214,7 +223,7 @@ export const getTop5CustomersByYear = catchAsync(async (req, res, next) => {
     },
     {
       $group: {
-        _id: '$userId', // Gộp theo ID người dùng (giả sử bạn có trường `userId` trong order)
+        _id: '$userId', // Gộp theo ID người dùng
         totalAmount: {
           $sum: { $multiply: ['$orderItems.quantity', '$orderItems.price'] }, // Tổng giá trị đơn hàng
         },
@@ -224,7 +233,7 @@ export const getTop5CustomersByYear = catchAsync(async (req, res, next) => {
       $sort: { totalAmount: -1 }, // Sắp xếp theo tổng giá trị đơn hàng giảm dần
     },
     {
-      $limit: 5, // Lấy top 5 khách hàng
+      $limit: 3, // Lấy top 5 khách hàng
     },
     {
       $lookup: {
@@ -274,7 +283,7 @@ export const getTop5CustomersByRange = catchAsync(async (req, res, next) => {
     {
       $match: {
         createdAt: { $gte: start, $lte: end }, // Lọc theo ngày bắt đầu và kết thúc
-        status: { $in: ['Đã nhận hàng', 'Đã giao hàng'] }, // Lọc theo trạng thái đơn hàng
+        status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] }, // Lọc theo trạng thái đơn hàng
       },
     },
     {
@@ -292,7 +301,7 @@ export const getTop5CustomersByRange = catchAsync(async (req, res, next) => {
       $sort: { totalAmount: -1 }, // Sắp xếp theo tổng giá trị đơn hàng giảm dần
     },
     {
-      $limit: 5, // Lấy top 5 khách hàng
+      $limit: 3, // Lấy top 5 khách hàng
     },
     {
       $lookup: {
@@ -335,7 +344,7 @@ export const getTop3BestSellingProductsByDay = catchAsync(
       {
         $match: {
           createdAt: { $gte: todayStart, $lte: todayEnd },
-          status: { $in: ['Đã nhận hàng', 'Đã giao hàng'] },
+          status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] },
         },
       },
       {
@@ -401,7 +410,7 @@ export const getTop3BestSellingProductsByWeek = catchAsync(
       {
         $match: {
           createdAt: { $gte: weekStart, $lte: weekEnd }, // Lọc đơn hàng trong tuần hiện tại
-          status: { $in: ['Đã nhận hàng', 'Đã giao hàng'] }, // Lọc theo trạng thái đơn hàng
+          status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] }, // Lọc theo trạng thái đơn hàng
         },
       },
       {
@@ -464,7 +473,7 @@ export const getTop3BestSellingProductsByMonth = catchAsync(
       {
         $match: {
           createdAt: { $gte: monthStart, $lte: monthEnd },
-          status: { $in: ['Đã nhận hàng', 'Đã giao hàng'] },
+          status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] },
         },
       },
       {
@@ -526,7 +535,7 @@ export const getTop3BestSellingProductsByYear = catchAsync(
       {
         $match: {
           createdAt: { $gte: yearStart, $lte: yearEnd },
-          status: { $in: ['Đã nhận hàng', 'Đã giao hàng'] },
+          status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] },
         },
       },
       {
@@ -587,7 +596,7 @@ export const getTop3BestSellingProductsByRange = catchAsync(
       {
         $match: {
           createdAt: { $gte: start, $lte: end },
-          status: { $in: ['Đã nhận hàng', 'Đã giao hàng'] },
+          status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] },
         },
       },
       {
@@ -644,7 +653,7 @@ export const getRevenueAndRefundsByDay = catchAsync(async (req, res, next) => {
     {
       $match: {
         createdAt: { $gte: todayStart, $lte: todayEnd }, // Lọc theo ngày bắt đầu và kết thúc
-        status: { $in: ['Đã giao hàng', 'Đã nhận hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
+        status: { $in: ['Đã giao hàng', 'Đã nhận được hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
       },
     },
     {
@@ -704,7 +713,7 @@ export const getRevenueAndRefundsByWeek = catchAsync(async (req, res, next) => {
     {
       $match: {
         createdAt: { $gte: weekStart, $lte: weekEnd }, // Lọc theo tuần hiện tại
-        status: { $in: ['Đã giao hàng', 'Đã nhận hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
+        status: { $in: ['Đã giao hàng', 'Đã nhận được hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
       },
     },
     {
@@ -762,7 +771,7 @@ export const getRevenueAndRefundsByMonth = catchAsync(
       {
         $match: {
           createdAt: { $gte: monthStart, $lte: monthEnd }, // Lọc theo tháng hiện tại
-          status: { $in: ['Đã giao hàng', 'Đã nhận hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
+          status: { $in: ['Đã giao hàng', 'Đã nhận được hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
         },
       },
       {
@@ -797,6 +806,7 @@ export const getRevenueAndRefundsByMonth = catchAsync(
         },
       },
     ]);
+    console.log(result);
 
     res.status(200).json({
       status: 'success',
@@ -820,7 +830,7 @@ export const getRevenueAndRefundsByYear = catchAsync(async (req, res, next) => {
     {
       $match: {
         createdAt: { $gte: yearStart, $lte: yearEnd }, // Lọc theo năm hiện tại
-        status: { $in: ['Đã giao hàng', 'Đã nhận hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
+        status: { $in: ['Đã giao hàng', 'Đã nhận được hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
       },
     },
     {
@@ -877,7 +887,7 @@ export const getRevenueAndRefundsByRange = catchAsync(
       {
         $match: {
           createdAt: { $gte: start, $lte: end }, // Lọc theo ngày bắt đầu và kết thúc
-          status: { $in: ['Đã giao hàng', 'Đã nhận hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
+          status: { $in: ['Đã giao hàng', 'Đã nhận được hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
         },
       },
       {
@@ -1352,16 +1362,22 @@ export const getTop3ProductsByInventoryByDay = catchAsync(
   async (req, res, next) => {
     // Lấy ngày hiện tại
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Đặt thời gian bắt đầu cho ngày hiện tại
+    const dayOfWeek = today.getDay(); // Lấy số ngày trong tuần (0: Chủ Nhật, 1: Thứ Hai, ..., 6: Thứ Bảy)
 
-    // Tính thời gian kết thúc trong ngày hiện tại (23:59:59)
-    const endOfDay = new Date(today);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Tính ngày đầu tuần (Chủ Nhật)
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - dayOfWeek); // Trừ đi số ngày trong tuần để đến Chủ Nhật
+    startOfWeek.setHours(0, 0, 0, 0); // Đặt thời gian về 00:00:00
+
+    // Tính ngày cuối tuần (Thứ Bảy)
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // Cộng thêm 6 ngày để đến Thứ Bảy
+    endOfWeek.setHours(23, 59, 59, 999); // Đặt thời gian kết thúc của ngày cuối tuần
 
     const result = await Product.aggregate([
       {
         $match: {
-          createdAt: { $gte: today, $lt: endOfDay }, // Lọc sản phẩm theo ngày hiện tại
+          createdAt: { $gte: startOfWeek, $lt: endOfWeek }, // Lọc sản phẩm theo tuần hiện tại
         },
       },
       {
