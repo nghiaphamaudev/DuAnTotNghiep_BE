@@ -100,8 +100,6 @@ export const createOrder = catchAsync(async (req, res, next) => {
       return res.status(StatusCodes.BAD_REQUEST).json({ messages });
     }
 
-    let totalPrice = calculateTotalPrice(orderItems);
-
     if (discountCode) {
       const voucher = await Voucher.findOne({ code: discountCode });
 
@@ -135,12 +133,11 @@ export const createOrder = catchAsync(async (req, res, next) => {
       }
 
       // Cập nhật voucher khi đủ điều kiện
-      await Voucher.findOneAndUpdate(
-        { code: discountCode },
-        { $push: { userIds: userId }, $inc: { usedCount: 1, quantity: -1 } }
-      );
     }
-
+    let totalPrice = calculateTotalPrice(orderItems);
+    if (shippingCost) totalPrice += shippingCost;
+    if (discountVoucher) totalPrice -= discountVoucher;
+    console.log(totalPrice);
     const code = `FS${dayjs().format('YYYYMMDDHHmmss')}`;
 
     // Gọi RollbackQuantityProduct và đảm bảo sẽ dừng quá trình nếu có lỗi
@@ -184,12 +181,18 @@ export const createOrder = catchAsync(async (req, res, next) => {
       creator: req.user.fullName,
       role: req.user.role,
       statusBill: 'Chờ xác nhận',
+
       note: '',
     });
 
     await historyBill.save({ session });
 
     await updateCartAfterOrder(userId, orderItems);
+
+    await Voucher.findOneAndUpdate(
+      { code: discountCode },
+      { $push: { userIds: userId }, $inc: { usedCount: 1, quantity: -1 } }
+    );
 
     await session.commitTransaction();
     session.endSession();
@@ -423,7 +426,7 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
     try {
       // Cập nhật trạng thái đơn hàng
       updateOrder.status = status;
-      updateOrder.statusShip = statusShip;
+      updateOrder.statusShip = statusShip ? statusShip : false;
       await updateOrder.save();
 
       // Rollback kho hàng
@@ -436,9 +439,17 @@ export const updateStatusOrder = catchAsync(async (req, res, next) => {
       // Chỉ hoàn tiền nếu có lịch sử giao dịch
       if (historyTransaction) {
         const idBill = historyTransaction.idBill.toString();
-        const totalMoney =
-          historyTransaction.totalMoney - updateOrder.shippingCost * 2;
-        console.log(totalMoney);
+        let totalMoney;
+
+        if (updateOrder.shippingCost === 0) {
+          // đơn hàng freeship  khách ko nhận thì khách chịu ship 1 chiều
+          totalMoney = historyTransaction.totalMoney - 30000;
+        } else {
+          // đơn hàng ko free ship khách ko nhận thì chịu 2 chiều
+          totalMoney =
+            historyTransaction.totalMoney - updateOrder.shippingCost * 2;
+        }
+
         await refundTransaction(
           req,
           res,
