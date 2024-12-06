@@ -6,6 +6,7 @@ import slugify from 'slugify';
 import { cloudinaryDelete } from '../middlewares/uploadCloud.middleware';
 import mongoose from 'mongoose';
 import Cart from '../models/cart.model';
+import Feedback from '../models/feedback.model';
 
 
 
@@ -130,6 +131,14 @@ export const getDetailProductById = catchAsync(async (req, res, next) => {
     return next(new AppError('Sản phẩm không tồn tại', StatusCodes.NOT_FOUND));
   }
 
+  const feedbacks = await Feedback.find({ productId: product._id })
+    .populate('user', 'rating fullName avatar');  // Populate user thông qua feedback
+
+  // Tính toán ratingAverage từ feedbacks
+  const totalRating = feedbacks.reduce((acc, feedback) => acc + feedback.rating, 0);
+  const ratingAverage = feedbacks.length > 0 ? totalRating / feedbacks.length : 0;
+  product.ratingAverage = ratingAverage;
+
   return res.status(StatusCodes.OK).json({ data: product });
 });
 
@@ -193,19 +202,16 @@ export const updateProduct = catchAsync(async (req, res, next) => {
     }
 
     const updatedSizes = variant.sizes.map((size, sizeIndex) => {
-      size.status = size.inventory > 0;
-      size._id = existingProduct.variants[index]?.sizes[sizeIndex]?._id;  // Giữ nguyên _id của size
+      size._id = existingProduct.variants[index]?.sizes[sizeIndex]?._id;
       return size;
     });
 
-    const updatedStatus = updatedSizes.some(size => size.status === true);
 
     return {
       ...variant,
       images: updatedImages,
       imageFiles: [],
       sizes: updatedSizes,
-      status: updatedStatus,
       _id: existingProduct.variants[index]?._id,  // Giữ nguyên _id của variant
     };
   }));
@@ -294,6 +300,61 @@ export const toggleVariantStatus = catchAsync(async (req, res, next) => {
 
 
 
+export const toggleSizeStatus = catchAsync(async (req, res, next) => {
+  const { productId, variantId, sizeId } = req.params;
+
+  // Tìm sản phẩm và biến thể có chứa size
+  const product = await Product.findOne({ _id: productId, 'variants._id': variantId });
+  if (!product) {
+    return next(new AppError('Sản phẩm hoặc biến thể không tồn tại', StatusCodes.NOT_FOUND));
+  }
+
+  const variant = product.variants.find(v => v._id.toString() === variantId);
+  if (!variant) {
+    return next(new AppError('Biến thể không tồn tại', StatusCodes.NOT_FOUND));
+  }
+
+  const size = variant.sizes.find(s => s._id.toString() === sizeId);
+  if (!size) {
+    return next(new AppError('Kích thước không tồn tại', StatusCodes.NOT_FOUND));
+  }
+
+  // Đổi trạng thái kích thước
+  const newStatus = size.status === true ? false : true;
+
+  await Product.findOneAndUpdate(
+    { _id: productId, 'variants._id': variantId, 'variants.sizes._id': sizeId },
+    {
+      $set: {
+        'variants.$[variant].sizes.$[size].status': newStatus,
+      },
+    },
+    {
+      arrayFilters: [
+        { 'variant._id': variantId }, // Điều kiện cho mảng variants
+        { 'size._id': sizeId },       // Điều kiện cho mảng sizes
+      ],
+      new: true,
+    }
+  );
+
+  // Nếu trạng thái bị tắt, xóa kích thước khỏi giỏ hàng
+  if (!newStatus) {
+    await Cart.updateMany(
+      { 'items.sizeId': sizeId },
+      { $pull: { items: { sizeId: sizeId } } }
+    );
+    console.log(`Kích thước ${sizeId} đã được xóa khỏi giỏ hàng`);
+  }
+
+  res.status(StatusCodes.OK).json({
+    status: 'OK',
+    message: `Trạng thái kích thước đã được đổi thành ${newStatus ? 'true' : 'false'}`,
+  });
+});
+
+
+
 
 
 
@@ -337,6 +398,14 @@ export const deleteProductStatus = async (req, res, next) => {
 
   product.isActive = !product.isActive;
   await product.save();
+
+  if (!product.isActive) {
+    await Cart.updateMany(
+      { 'items.productId': id },
+      { $pull: { items: { productId: id } } }
+    );
+    console.log(`Product ${id} đã được xóa khỏi tất cả các giỏ hàng`);
+  }
 
   res.status(200).json({
     status: 'success',

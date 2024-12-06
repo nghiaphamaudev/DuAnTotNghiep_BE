@@ -9,6 +9,7 @@ import {
   updateProduct,
   getDetailProductBySlug,
   toggleVariantStatus,
+  toggleSizeStatus,
 } from '../controllers/product.controller';
 
 import { uploadProductImages } from '../middlewares/uploadCloud.middleware';
@@ -24,5 +25,6 @@ productRouter.delete('/:id', deleteProduct);
 productRouter.get('/:categoryId/related/:productId', relatedProduct);
 productRouter.patch('/:id/status', deleteProductStatus);
 productRouter.put('/:productId/variant/:variantId', toggleVariantStatus)
+productRouter.put('/:productId/variant/:variantId/size/:sizeId', toggleSizeStatus)
 
 export default productRouter;
