@@ -48,6 +48,8 @@ BE/
 │ └── userRoutes.js # Các route cho người dùng
 ├── services/ # Chứa các dịch vụ tái sử dụng (gửi email, thông báo, v.v.)
 │ └── emailService.js # Dịch vụ gửi email
+├── sockets/
+│   └── socket.handler.js
 ├── utils/ # Chứa các hàm tiện ích
 │ └── validators.js # Hàm validate dữ liệu
 │ └── helpers.js # Các helper chung
@@ -57,3 +59,14 @@ BE/
 └── app.js # Dùng để quản lí sử dụng các middleware, routes
 ├── server.js # Điểm vào của ứng dụng (nơi khởi động server)
 └── README.md # Hướng dẫn sử dụng dự án
+
+
+---------------------------SOCKET.IO----------------------------------
+# FE
+1. Cai dat socket.io : npm i socket.io-client
+2. Cau hinh 
+   socket.js  import { io } from 'socket.io-client'
+               const socket = io('http://localhost:3000'); 
+               export default socket;
+    App.js
+
