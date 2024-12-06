@@ -1,5 +1,10 @@
 import express from 'express';
 import {
+  getAllOrder,
+  getOrderDetailByUser,
+  updateStatusOrderByAdmin,
+} from '../controllers/order.controller';
+import {
   getAllAdminsAndSuperAdmins,
   getAllUserAccounts,
   blockedAccBySuperAdmin,
@@ -18,11 +23,11 @@ import {
 const adminRouter = express.Router({ mergeParams: true });
 
 adminRouter.post('/login', loginAdmin);
+
 adminRouter.post('/create-account', createAccBySuperAdmin);
 
 //Middleware check đăng nhập ,quyền truy cập tài nguyên
 adminRouter.use(protectAdmin);
-
 
 //cập nhật mật khẩu superadmi, admin (tự cập nhật)
 adminRouter.patch('/update-password', updatePasswordManagement);
@@ -40,5 +45,9 @@ adminRouter.patch('/update-infor-admin/:idAdmin', updateAccountAdmin);
 adminRouter.patch('/blocked-account/:idAdmin', blockedAccBySuperAdmin);
 // block tài khoản user
 adminRouter.patch('/blocked-account-user/:idUser', blockedUserAccBySuperAdmin);
+
+adminRouter.get('/bill/:orderId', getOrderDetailByUser);
+adminRouter.patch('/update-order-admin', updateStatusOrderByAdmin);
+adminRouter.get('/all-order', getAllOrder);
 
 export default adminRouter;

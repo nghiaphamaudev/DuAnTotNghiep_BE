@@ -23,9 +23,17 @@ const historyBillSchema = new mongoose.Schema(
       required: true,
     },
     statusBill: {
-      // giống status order
       type: String,
-      required: true,
+      enum: [
+        'Chờ xác nhận',
+        'Đã xác nhận',
+        'Đóng gói chờ vận chuyển',
+        'Đang giao hàng',
+        'Đã giao hàng',
+        'Hoàn đơn',
+        'Đã hủy',
+        'Đã nhận được hàng',
+      ],
     },
     note: {
       type: String,
