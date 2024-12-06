@@ -148,19 +148,7 @@ export const getAllUserAccounts = catchAsync(async (req, res, next) => {
 });
 
 export const getAllAdminsAndSuperAdmins = catchAsync(async (req, res, next) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = 6;
-
-  const skip = (page - 1) * limit;
-
-  // Lấy danh sách admin và superadmin
-  const adminsAndSuperAdmins = await Admin.find().skip(skip).limit(limit);
-
-  // Đếm tổng số admin và superadmin (trừ người dùng hiện tại)
-  const totalAdminsAndSuperAdmins = await Admin.countDocuments();
-
-  // Tính tổng số trang
-  const totalPages = Math.ceil(totalAdminsAndSuperAdmins / limit);
+  const adminsAndSuperAdmins = await Admin.find();
 
   // Tách admin và superadmin từ danh sách
   const admins = adminsAndSuperAdmins.filter((user) => user.role === 'admin');
@@ -171,24 +159,11 @@ export const getAllAdminsAndSuperAdmins = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: true,
     message: 'Thành công',
-
     admins: {
       data: admins,
-      pagination: {
-        currentPage: page,
-        totalPages,
-        limit,
-        totalUsers: admins.length,
-      },
     },
     superAdmins: {
       data: superAdmins,
-      pagination: {
-        currentPage: page,
-        totalPages,
-        limit,
-        totalUsers: superAdmins.length,
-      },
     },
   });
 });
