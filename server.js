@@ -1,35 +1,32 @@
 import connectDB from './configs/db.config.js';
 import app from './app.js';
 import dotenv from 'dotenv';
-import http from 'http';
+import { createServer } from 'http';
 import { Server } from 'socket.io';
-dotenv.config();
 
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: 'http://localhost:3000', // Địa chỉ frontend
-    methods: ['GET', 'POST'],
-  },
-});
+dotenv.config();
 
 const DB = process.env.DATABASE_LOCAL;
 const DB_URL = process.env.DATABASE_URL;
 const PORT = process.env.PORT;
 
-io.on('connection', (socket) => {
-  console.log('A user connected');
-  // Xử lý sự kiện 'disconnect'
-  socket.on('disconnect', () => {
-    console.log('A user disconnected');
-  });
-  // Xử lý sự kiện tùy chỉnh
-  socket.on('chat message', (msg) => {
-    console.log('Message: ' + msg);
-    // Gửi lại tin nhắn cho tất cả người dùng
-    io.emit('chat message', msg);
-  });
-});
+// const httpServer = createServer(app);
+
+// export const io = new Server(httpServer, {
+//   cors: {
+//     origin: 'http://127.0.0.1:5500', // cổng FE
+//     methods: ['GET', 'POST'],
+//   },
+// });
+
+// io.on('connection', (socket) => {
+//   console.log('A user connected:', socket.id);
+
+//   // Các handler cho các sự kiện socket (nếu có)
+//   socket.on('disconnect', () => {
+//     console.log('A user disconnected:', socket.id);
+//   });
+// });
 
 connectDB(DB_URL);
 

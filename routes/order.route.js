@@ -3,20 +3,17 @@ import { protect } from '../controllers/auth.controller';
 import {
   createOrder,
   getAllOrderByUserId,
-  updateStatusOrder,
   getOrderDetailByUser,
-  getAllOrder,
+  updateStatusOrderByUser,
 } from '../controllers/order.controller';
 import { getCartByUser } from '../controllers/cart.controller';
+import { protectAdmin } from '../middlewares/checkRole.middeleware';
 
 const orderRouter = Router();
 
-orderRouter.use(protect);
-
-orderRouter.post('/', getCartByUser, createOrder);
-orderRouter.get('/', getAllOrderByUserId);
-orderRouter.get('/all-order', getAllOrder);
-orderRouter.get('/:orderId', getOrderDetailByUser);
-orderRouter.patch('/update-order', updateStatusOrder);
+orderRouter.get('/:orderId', protect, getOrderDetailByUser);
+orderRouter.post('/', protect, getCartByUser, createOrder);
+orderRouter.get('/', protect, getAllOrderByUserId);
+orderRouter.patch('/update-order', protect, updateStatusOrderByUser);
 
 export default orderRouter;
