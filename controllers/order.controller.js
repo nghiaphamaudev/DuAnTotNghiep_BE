@@ -508,6 +508,7 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
     idBill: idOrder,
   });
   const userId = updateOrder.userId;
+  const user = await User.findById(updateOrder.userId);
 
   if (!status) {
     return next(
@@ -693,7 +694,7 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
       updateOrder.totalCost,
       updateOrder.discountVoucher,
       updateOrder.shippingCost,
-      req.user.email,
+      user.email,
       title,
       updateOrder.receiver,
       updateOrder.phoneNumber,
