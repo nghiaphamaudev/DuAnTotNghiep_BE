@@ -10,23 +10,23 @@ const DB = process.env.DATABASE_LOCAL;
 const DB_URL = process.env.DATABASE_URL;
 const PORT = process.env.PORT;
 
-const httpServer = createServer(app);
+// const httpServer = createServer(app);
 
-export const io = new Server(httpServer, {
-  cors: {
-    origin: 'http://127.0.0.1:5500', // cổng FE
-    methods: ['GET', 'POST'],
-  },
-});
+// export const io = new Server(httpServer, {
+//   cors: {
+//     origin: 'http://127.0.0.1:5500', // cổng FE
+//     methods: ['GET', 'POST'],
+//   },
+// });
 
-io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+// io.on('connection', (socket) => {
+//   console.log('A user connected:', socket.id);
 
-  // Các handler cho các sự kiện socket (nếu có)
-  socket.on('disconnect', () => {
-    console.log('A user disconnected:', socket.id);
-  });
-});
+//   // Các handler cho các sự kiện socket (nếu có)
+//   socket.on('disconnect', () => {
+//     console.log('A user disconnected:', socket.id);
+//   });
+// });
 
 connectDB(DB_URL);
 
