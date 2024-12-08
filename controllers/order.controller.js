@@ -4,7 +4,7 @@ import Order from '../models/order.model';
 import HistoryBill from '../models/historyBill.model';
 import HistoryTransaction from '../models/historyTransaction.model';
 import dayjs from 'dayjs';
-import axios from 'axios';
+import moment from 'moment';
 import { format } from 'date-fns';
 import { StatusCodes } from 'http-status-codes';
 import catchAsync from '../utils/catchAsync.util';
@@ -31,18 +31,6 @@ function calculateTotalPrice(items) {
   return items.reduce((total, item) => {
     return total + item.quantity * item.price;
   }, 0);
-}
-
-function generateRandomSequence(template) {
-  const digits = template.split('').map(Number); // Tách từng số từ mẫu
-  const result = digits.map(() => Math.floor(Math.random() * 10)); // Random mỗi số từ 0-9
-  return result.join(''); // Gộp thành chuỗi
-}
-
-function getLastName(fullName) {
-  if (!fullName) return ''; // Trường hợp chuỗi rỗng hoặc undefined
-  const parts = fullName.trim().split(' '); // Loại bỏ khoảng trắng thừa và tách chuỗi
-  return parts[parts.length - 1]; // Lấy phần tử cuối cùng
 }
 
 const updateCartAfterOrder = async (userId, orderItems) => {
@@ -251,6 +239,8 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     path: 'orderItems.productId',
     select: 'name coverImg variants',
   });
+  if (!order)
+    return next(new AppError('Order không tồn tại!', StatusCodes.NOT_FOUND));
   const userId = order.userId;
   const user = await User.findById(userId);
   if (!user) {
@@ -338,10 +328,10 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
           totalPrice: historyTransaction.totalMoney,
           type: historyTransaction.type,
           transactionVnPayId: historyTransaction.transactionVnPayId,
-          createdAt: format(
-            new Date(historyTransaction.transactionVnPayDate),
-            'dd/MM/yyyy HH:mm:ss'
-          ),
+          createdAt: moment(
+            historyTransaction.transactionVnPayDate,
+            'YYYYMMDDHHmmss'
+          ).format('DD/MM/YYYY HH:mm:ss'),
         }
       : {
           totalPrice: historyTransaction.totalMoney,
