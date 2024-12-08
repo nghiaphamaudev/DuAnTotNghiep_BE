@@ -631,10 +631,12 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
   if (status === 'Đã giao hàng') {
     updateOrder.status = status;
     await updateOrder.save();
-    // const user = {
-    //   email: updateOrder.userId.email,
-    //   fullName: updateOrder.userId.fullName,
-    // };
+    console.log(updateOrder);
+    const user = {
+      id: updateOrder.userId.id,
+      email: updateOrder.userId.email,
+      fullName: updateOrder.userId.fullName,
+    };
 
     // await sendMailDelivered(
     //   user,
@@ -646,8 +648,9 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
     // );
 
     if (!historyTransaction) {
+      console.log(user.id);
       const historyTransactionCod = new HistoryTransaction({
-        idUser: req.user.id,
+        idUser: user.id,
         idBill: id,
         totalMoney: updateOrder.totalCost,
         note: '',
