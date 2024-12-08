@@ -33,17 +33,11 @@ function calculateTotalPrice(items) {
   }, 0);
 }
 
-const applyVoucher = (voucher, totalPrice) => {
-  if (voucher.discountType === 'percentage') {
-    return totalPrice - (totalPrice * voucher.discountPercentage) / 100;
-  }
-
-  if (voucher.discountType === 'amount') {
-    return Math.max(0, totalPrice - voucher.discountAmount);
-  }
-
-  return totalPrice; // Nếu không áp dụng voucher
-};
+function generateRandomSequence(template) {
+  const digits = template.split('').map(Number); // Tách từng số từ mẫu
+  const result = digits.map(() => Math.floor(Math.random() * 10)); // Random mỗi số từ 0-9
+  return result.join(''); // Gộp thành chuỗi
+}
 
 function getLastName(fullName) {
   if (!fullName) return ''; // Trường hợp chuỗi rỗng hoặc undefined
@@ -309,6 +303,7 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
   // Tính tổng giá tiền cho đơn hàng
 
   // Trả lại lịch sử đơn hàng
+
   const historyBills = await HistoryBill.find({ idBill: orderId });
 
   const formattedHistoryBills = historyBills.map((bill) => ({
@@ -335,20 +330,29 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
   const historyTransaction = await HistoryTransaction.findOne({
     idBill: orderId,
   });
-
+  let formattedHistoryTransaction;
   // Kiểm tra nếu không tìm thấy lịch sử thanh toán
-
-  const formattedHistoryTransaction = historyTransaction
-    ? {
-        totalPrice: historyTransaction.totalMoney,
-        type: historyTransaction.type,
-        transactionVnPayId: historyTransaction.transactionVnPayId,
-        createdAt: format(
-          new Date(historyTransaction.transactionVnPayDate),
-          'dd/MM/yyyy HH:mm:ss'
-        ),
-      }
-    : null;
+  if (historyTransaction) {
+    formattedHistoryTransaction = historyTransaction.transactionVnPayId
+      ? {
+          totalPrice: historyTransaction.totalMoney,
+          type: historyTransaction.type,
+          transactionVnPayId: historyTransaction.transactionVnPayId,
+          createdAt: format(
+            new Date(historyTransaction.transactionVnPayDate),
+            'dd/MM/yyyy HH:mm:ss'
+          ),
+        }
+      : {
+          totalPrice: historyTransaction.totalMoney,
+          type: historyTransaction.type,
+          transactionVnPayId: historyTransaction.transactionVnPayId,
+          createdAt: format(
+            new Date(historyTransaction.createdAt), // Dấu phẩy sau đối số đầu tiên
+            'dd/MM/yyyy HH:mm:ss'
+          ),
+        };
+  }
 
   // Trả lại kết quả
   res.status(200).json({
@@ -442,34 +446,34 @@ export const updateStatusOrderByUser = catchAsync(async (req, res, next) => {
       select: 'email fullName',
     });
 
-  const orderDate = format(
-    new Date(updateOrder.createdAt),
-    'dd/MM/yyyy HH:mm:ss'
-  );
+  // const orderDate = format(
+  //   new Date(updateOrder.createdAt),
+  //   'dd/MM/yyyy HH:mm:ss'
+  // );
 
-  const orderDetails = await Promise.all(
-    updateOrder.orderItems.map(async (item) => {
-      const product = item.productId;
+  // const orderDetails = await Promise.all(
+  //   updateOrder.orderItems.map(async (item) => {
+  //     const product = item.productId;
 
-      const variant = product.variants.find(
-        (v) => v._id.toString() === item.variantId
-      );
+  //     const variant = product.variants.find(
+  //       (v) => v._id.toString() === item.variantId
+  //     );
 
-      const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
+  //     const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
 
-      return {
-        id: item._id,
-        productId: product._id,
-        name: product.name,
-        color: variant.color,
-        images: variant.images[0],
-        size: size.nameSize,
-        price: size.price,
-        quantity: item.quantity,
-        totalItemPrice: size.price * item.quantity,
-      };
-    })
-  );
+  //     return {
+  //       id: item._id,
+  //       productId: product._id,
+  //       name: product.name,
+  //       color: variant.color,
+  //       images: variant.images[0],
+  //       size: size.nameSize,
+  //       price: size.price,
+  //       quantity: item.quantity,
+  //       totalItemPrice: size.price * item.quantity,
+  //     };
+  //   })
+  // );
 
   if (status === 'Đã nhận được hàng') {
     const bulkOperations = updateOrder.orderItems.map((item) => ({
@@ -631,7 +635,6 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
   if (status === 'Đã giao hàng') {
     updateOrder.status = status;
     await updateOrder.save();
-    console.log(updateOrder);
     const user = {
       id: updateOrder.userId.id,
       email: updateOrder.userId.email,
@@ -648,7 +651,6 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
     // );
 
     if (!historyTransaction) {
-      console.log(user.id);
       const historyTransactionCod = new HistoryTransaction({
         idUser: user.id,
         idBill: id,
