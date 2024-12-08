@@ -147,7 +147,6 @@ export const paymentRedirect = async (req, res, next) => {
   var signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
   if (vnp_Params['vnp_TransactionStatus'] === '00') {
-    console.log(vnp_Params);
     await Order.updateOne(
       { _id: vnp_Params['vnp_TxnRef'] },
       {
