@@ -160,6 +160,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
     await order.save({ session });
 
     if (paymentMethod === 'VNPAY') {
+      await updateCartAfterOrder(userId, orderItems);
       const urlPayment = createPaymentUrl(
         req,
         totalPrice,

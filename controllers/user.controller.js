@@ -384,16 +384,14 @@ export const getAllUser = catchAsync(async (req, res, next) => {
 });
 
 export const getUserById = catchAsync(async (req, res, next) => {
-  const user = await User.findById(req.params.userId);
-  if (!user)
-    return next(new AppError('User không tồn tại!', StatusCodes.NOT_FOUND));
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user)
+      return next(new AppError('User không tồn tại!', StatusCodes.NOT_FOUND));
 
-  // Tách thông tin chung của người dùng
-
-  // Lấy danh sách địa chỉ và gọi API để lấy thông tin chi tiết
-  const addresses = await Promise.all(
-    user.addresses.map(async (address) => {
-      try {
+    // Lấy danh sách địa chỉ và gọi API để lấy thông tin chi tiết
+    const addresses = await Promise.all(
+      user.addresses.map(async (address) => {
         const [provinceResponse, districtResponse, wardResponse] =
           await Promise.all([
             axios.get(
@@ -429,35 +427,36 @@ export const getUserById = catchAsync(async (req, res, next) => {
           _id: address._id,
           id: address.id,
         };
-      } catch (error) {
-        return next(
-          new AppError(
-            'Lỗi khi gọi API địa chỉ',
-            StatusCodes.INTERNAL_SERVER_ERROR
-          )
-        );
-      }
-    })
-  );
+      })
+    );
 
-  res.status(StatusCodes.OK).json({
-    status: true,
-    message: 'Thành công',
-    data: {
-      _id: user._id,
-      email: user.email,
-      fullName: user.fullName,
-      phoneNumber: user.phoneNumber,
-      avatar: user.avatar,
-      role: user.role,
-      rank: user.rank,
-      gender: user.gender,
-      active: user.active,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      addresses,
-    },
-  });
+    res.status(StatusCodes.OK).json({
+      status: true,
+      message: 'Thành công',
+      data: {
+        _id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        phoneNumber: user.phoneNumber,
+        avatar: user.avatar,
+        role: user.role,
+        rank: user.rank,
+        gender: user.gender,
+        active: user.active,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        addresses,
+      },
+    });
+  } catch (error) {
+    // Xử lý lỗi cho toàn bộ try-catch
+    return next(
+      new AppError(
+        error.message || 'Lỗi không xác định',
+        StatusCodes.INTERNAL_SERVER_ERROR
+      )
+    );
+  }
 });
 
 export const deleteUserById = catchAsync(async (req, res, next) => {
