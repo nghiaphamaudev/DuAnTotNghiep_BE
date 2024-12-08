@@ -67,7 +67,6 @@ const updateCartAfterOrder = async (userId, orderItems) => {
         },
       }
     );
-    console.log('Cập nhật giỏ hàng thành công sau khi đặt hàng!');
   } catch (error) {
     console.error('Lỗi khi cập nhật giỏ hàng:', error);
   }
@@ -138,7 +137,6 @@ export const createOrder = catchAsync(async (req, res, next) => {
     let totalPrice = calculateTotalPrice(orderItems);
     if (shippingCost) totalPrice += shippingCost;
     if (discountVoucher) totalPrice -= discountVoucher;
-    console.log(totalPrice);
     const code = `FS${dayjs().format('YYYYMMDDHHmmss')}`;
 
     // Gọi RollbackQuantityProduct và đảm bảo sẽ dừng quá trình nếu có lỗi
@@ -259,7 +257,6 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     path: 'orderItems.productId',
     select: 'name coverImg variants',
   });
-  console.log(order);
   const userId = order.userId;
   const user = await User.findById(userId);
   if (!user) {
@@ -345,8 +342,9 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     ? {
         totalPrice: historyTransaction.totalMoney,
         type: historyTransaction.type,
+        transactionVnPayId: historyTransaction.transactionVnPayId,
         createdAt: format(
-          new Date(historyTransaction.createdAt),
+          new Date(historyTransaction.transactionVnPayDate),
           'dd/MM/yyyy HH:mm:ss'
         ),
       }
@@ -633,30 +631,30 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
   if (status === 'Đã giao hàng') {
     updateOrder.status = status;
     await updateOrder.save();
-    const user = {
-      email: updateOrder.userId.email,
-      fullName: updateOrder.userId.fullName,
-    };
+    // const user = {
+    //   email: updateOrder.userId.email,
+    //   fullName: updateOrder.userId.fullName,
+    // };
 
-    await sendMailDelivered(
-      user,
-      'Đơn hàng đã được giao thành công!',
-      updateOrder.code,
-      orderDate,
-      updateOrder.paymentMethod,
-      updateOrder.totalPrice
-    );
+    // await sendMailDelivered(
+    //   user,
+    //   'Đơn hàng đã được giao thành công!',
+    //   updateOrder.code,
+    //   orderDate,
+    //   updateOrder.paymentMethod,
+    //   updateOrder.totalPrice
+    // );
 
-    const historyTransaction = new HistoryTransaction({
-      idUser: req.user.id,
-      idBill: id,
-      totalMoney: updateOrder.totalCost,
-      note: '',
-      status: true,
-    });
-    updateOrder.status = status;
-    await updateOrder.save();
-    await historyTransaction.save();
+    if (!historyTransaction) {
+      const historyTransactionCod = new HistoryTransaction({
+        idUser: req.user.id,
+        idBill: id,
+        totalMoney: updateOrder.totalCost,
+        note: '',
+        status: true,
+      });
+      await historyTransactionCod.save();
+    }
   }
 
   const orderDetails = await Promise.all(

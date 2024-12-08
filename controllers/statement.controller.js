@@ -806,7 +806,6 @@ export const getRevenueAndRefundsByMonth = catchAsync(
         },
       },
     ]);
-    console.log(result);
 
     res.status(200).json({
       status: 'success',
