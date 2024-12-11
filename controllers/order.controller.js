@@ -4,7 +4,7 @@ import Order from '../models/order.model';
 import HistoryBill from '../models/historyBill.model';
 import HistoryTransaction from '../models/historyTransaction.model';
 import dayjs from 'dayjs';
-import axios from 'axios';
+import moment from 'moment';
 import { format } from 'date-fns';
 import { StatusCodes } from 'http-status-codes';
 import catchAsync from '../utils/catchAsync.util';
@@ -33,24 +33,6 @@ function calculateTotalPrice(items) {
   }, 0);
 }
 
-const applyVoucher = (voucher, totalPrice) => {
-  if (voucher.discountType === 'percentage') {
-    return totalPrice - (totalPrice * voucher.discountPercentage) / 100;
-  }
-
-  if (voucher.discountType === 'amount') {
-    return Math.max(0, totalPrice - voucher.discountAmount);
-  }
-
-  return totalPrice; // Nếu không áp dụng voucher
-};
-
-function getLastName(fullName) {
-  if (!fullName) return ''; // Trường hợp chuỗi rỗng hoặc undefined
-  const parts = fullName.trim().split(' '); // Loại bỏ khoảng trắng thừa và tách chuỗi
-  return parts[parts.length - 1]; // Lấy phần tử cuối cùng
-}
-
 const updateCartAfterOrder = async (userId, orderItems) => {
   try {
     await Cart.updateOne(
@@ -67,7 +49,6 @@ const updateCartAfterOrder = async (userId, orderItems) => {
         },
       }
     );
-    console.log('Cập nhật giỏ hàng thành công sau khi đặt hàng!');
   } catch (error) {
     console.error('Lỗi khi cập nhật giỏ hàng:', error);
   }
@@ -138,7 +119,6 @@ export const createOrder = catchAsync(async (req, res, next) => {
     let totalPrice = calculateTotalPrice(orderItems);
     if (shippingCost) totalPrice += shippingCost;
     if (discountVoucher) totalPrice -= discountVoucher;
-    console.log(totalPrice);
     const code = `FS${dayjs().format('YYYYMMDDHHmmss')}`;
 
     // Gọi RollbackQuantityProduct và đảm bảo sẽ dừng quá trình nếu có lỗi
@@ -160,6 +140,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
     await order.save({ session });
 
     if (paymentMethod === 'VNPAY') {
+      await updateCartAfterOrder(userId, orderItems);
       const urlPayment = createPaymentUrl(
         req,
         totalPrice,
@@ -258,7 +239,8 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     path: 'orderItems.productId',
     select: 'name coverImg variants',
   });
-  console.log(order);
+  if (!order)
+    return next(new AppError('Order không tồn tại!', StatusCodes.NOT_FOUND));
   const userId = order.userId;
   const user = await User.findById(userId);
   if (!user) {
@@ -311,6 +293,7 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
   // Tính tổng giá tiền cho đơn hàng
 
   // Trả lại lịch sử đơn hàng
+
   const historyBills = await HistoryBill.find({ idBill: orderId });
 
   const formattedHistoryBills = historyBills.map((bill) => ({
@@ -337,19 +320,29 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
   const historyTransaction = await HistoryTransaction.findOne({
     idBill: orderId,
   });
-
+  let formattedHistoryTransaction;
   // Kiểm tra nếu không tìm thấy lịch sử thanh toán
-
-  const formattedHistoryTransaction = historyTransaction
-    ? {
-        totalPrice: historyTransaction.totalMoney,
-        type: historyTransaction.type,
-        createdAt: format(
-          new Date(historyTransaction.createdAt),
-          'dd/MM/yyyy HH:mm:ss'
-        ),
-      }
-    : null;
+  if (historyTransaction) {
+    formattedHistoryTransaction = historyTransaction.transactionVnPayId
+      ? {
+          totalPrice: historyTransaction.totalMoney,
+          type: historyTransaction.type,
+          transactionVnPayId: historyTransaction.transactionVnPayId,
+          createdAt: moment(
+            historyTransaction.transactionVnPayDate,
+            'YYYYMMDDHHmmss'
+          ).format('DD/MM/YYYY HH:mm:ss'),
+        }
+      : {
+          totalPrice: historyTransaction.totalMoney,
+          type: historyTransaction.type,
+          transactionVnPayId: historyTransaction.transactionVnPayId,
+          createdAt: format(
+            new Date(historyTransaction.createdAt), // Dấu phẩy sau đối số đầu tiên
+            'dd/MM/yyyy HH:mm:ss'
+          ),
+        };
+  }
 
   // Trả lại kết quả
   res.status(200).json({
@@ -443,34 +436,34 @@ export const updateStatusOrderByUser = catchAsync(async (req, res, next) => {
       select: 'email fullName',
     });
 
-  const orderDate = format(
-    new Date(updateOrder.createdAt),
-    'dd/MM/yyyy HH:mm:ss'
-  );
+  // const orderDate = format(
+  //   new Date(updateOrder.createdAt),
+  //   'dd/MM/yyyy HH:mm:ss'
+  // );
 
-  const orderDetails = await Promise.all(
-    updateOrder.orderItems.map(async (item) => {
-      const product = item.productId;
+  // const orderDetails = await Promise.all(
+  //   updateOrder.orderItems.map(async (item) => {
+  //     const product = item.productId;
 
-      const variant = product.variants.find(
-        (v) => v._id.toString() === item.variantId
-      );
+  //     const variant = product.variants.find(
+  //       (v) => v._id.toString() === item.variantId
+  //     );
 
-      const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
+  //     const size = variant.sizes.find((s) => s._id.toString() === item.sizeId);
 
-      return {
-        id: item._id,
-        productId: product._id,
-        name: product.name,
-        color: variant.color,
-        images: variant.images[0],
-        size: size.nameSize,
-        price: size.price,
-        quantity: item.quantity,
-        totalItemPrice: size.price * item.quantity,
-      };
-    })
-  );
+  //     return {
+  //       id: item._id,
+  //       productId: product._id,
+  //       name: product.name,
+  //       color: variant.color,
+  //       images: variant.images[0],
+  //       size: size.nameSize,
+  //       price: size.price,
+  //       quantity: item.quantity,
+  //       totalItemPrice: size.price * item.quantity,
+  //     };
+  //   })
+  // );
 
   if (status === 'Đã nhận được hàng') {
     const bulkOperations = updateOrder.orderItems.map((item) => ({
@@ -633,29 +626,30 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
     updateOrder.status = status;
     await updateOrder.save();
     const user = {
+      id: updateOrder.userId.id,
       email: updateOrder.userId.email,
       fullName: updateOrder.userId.fullName,
     };
 
-    await sendMailDelivered(
-      user,
-      'Đơn hàng đã được giao thành công!',
-      updateOrder.code,
-      orderDate,
-      updateOrder.paymentMethod,
-      updateOrder.totalPrice
-    );
+    // await sendMailDelivered(
+    //   user,
+    //   'Đơn hàng đã được giao thành công!',
+    //   updateOrder.code,
+    //   orderDate,
+    //   updateOrder.paymentMethod,
+    //   updateOrder.totalPrice
+    // );
 
-    const historyTransaction = new HistoryTransaction({
-      idUser: req.user.id,
-      idBill: id,
-      totalMoney: updateOrder.totalCost,
-      note: '',
-      status: true,
-    });
-    updateOrder.status = status;
-    await updateOrder.save();
-    await historyTransaction.save();
+    if (!historyTransaction) {
+      const historyTransactionCod = new HistoryTransaction({
+        idUser: user.id,
+        idBill: id,
+        totalMoney: updateOrder.totalCost,
+        note: '',
+        status: true,
+      });
+      await historyTransactionCod.save();
+    }
   }
 
   const orderDetails = await Promise.all(

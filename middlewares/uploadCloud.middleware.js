@@ -89,7 +89,6 @@ export const cloudinaryDelete = async (imageUrls) => {
       await cloudinary.v2.api.delete_resources(publicIds);
     }
 
-    console.log('Ảnh đã được xóa thành công');
   } catch (error) {
     console.error('Lỗi khi xóa ảnh:', error);
   }
