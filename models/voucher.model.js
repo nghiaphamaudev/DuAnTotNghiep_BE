@@ -50,6 +50,9 @@ voucherSchema.pre('save', function (next) {
   if (this.expirationDate < now) {
     this.status = 'expired';
   }
+  if (this.quantity === 0) {
+    this.status = 'expired';
+  }
   next();
 });
 

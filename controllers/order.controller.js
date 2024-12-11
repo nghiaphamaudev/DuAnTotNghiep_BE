@@ -114,7 +114,16 @@ export const createOrder = catchAsync(async (req, res, next) => {
         );
       }
 
-      // Cập nhật voucher khi đủ điều kiện
+      await Voucher.findOneAndUpdate(
+        { code: discountCode },
+        {
+          $push: { userIds: userId },
+          $inc: { usedCount: 1, quantity: -1 },
+          $set: {
+            status: voucher.quantity - 1 === 0 ? 'expired' : voucher.status,
+          },
+        }
+      );
     }
     let totalPrice = calculateTotalPrice(orderItems);
     if (shippingCost) totalPrice += shippingCost;
@@ -170,11 +179,6 @@ export const createOrder = catchAsync(async (req, res, next) => {
     await historyBill.save({ session });
 
     await updateCartAfterOrder(userId, orderItems);
-
-    await Voucher.findOneAndUpdate(
-      { code: discountCode },
-      { $push: { userIds: userId }, $inc: { usedCount: 1, quantity: -1 } }
-    );
 
     await session.commitTransaction();
     session.endSession();
