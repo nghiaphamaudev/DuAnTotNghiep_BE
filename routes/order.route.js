@@ -9,7 +9,7 @@ import {
 import { getCartByUser } from '../controllers/cart.controller';
 import { protectAdmin } from '../middlewares/checkRole.middeleware';
 
-const orderRouter = Router();
+const orderRouter = Router({ mergeParams: true });
 
 orderRouter.get('/:orderId', protect, getOrderDetailByUser);
 orderRouter.post('/', protect, getCartByUser, createOrder);

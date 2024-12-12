@@ -14,6 +14,9 @@ import {
   blockedUserAccBySuperAdmin,
   updatePasswordManagement,
   getAdminById,
+  getOrderStatistics,
+  updatePaymentRestriction,
+  getAllOrderByUserId,
 } from '../controllers/superAdmin.controller';
 import {
   protectAdmin,
@@ -34,9 +37,13 @@ adminRouter.patch('/update-password', updatePasswordManagement);
 //lấy thong tin superadmin, admin
 adminRouter.get('/get-me', getAdminById);
 // middleware check quyền
-adminRouter.use(checkAdminRole('superadmin'));
+
+// adminRouter.use(checkAdminRole('superadmin'));
+
 //lấy all tài khoản supeadmin, admin
+
 adminRouter.get('/manage-account', getAllAdminsAndSuperAdmins);
+
 //lấy all tài khoản user
 adminRouter.get('/users', getAllUserAccounts);
 //Cập  nhật mật khẩu do superadmin cập nhật cho admin
@@ -45,6 +52,12 @@ adminRouter.patch('/update-infor-admin/:idAdmin', updateAccountAdmin);
 adminRouter.patch('/blocked-account/:idAdmin', blockedAccBySuperAdmin);
 // block tài khoản user
 adminRouter.patch('/blocked-account-user/:idUser', blockedUserAccBySuperAdmin);
+//Thông số báo cáo tỉ lẹ đơn đặt hàng của user
+adminRouter.get('/orders/user/:userId/statistics', getOrderStatistics);
+//Lấy tất cả đơn hàng của user
+adminRouter.get('/orders/user/:userId', getAllOrderByUserId);
+//cập nhật trạng thái yêu cầu thanh toán trước
+adminRouter.get('/user/:userId/payment-restriction', updatePaymentRestriction);
 
 adminRouter.get('/bill/:orderId', getOrderDetailByUser);
 adminRouter.patch('/update-order-admin', updateStatusOrderByAdmin);
