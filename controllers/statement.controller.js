@@ -1,8 +1,6 @@
-// Đường dẫn import chính xác tùy vào cấu trúc dự án
-import { StatusCodes } from 'http-status-codes';
 import Order from '../models/order.model';
 import Product from '../models/product.model';
-import AppError from '../utils/appError.util';
+
 import catchAsync from '../utils/catchAsync.util';
 
 //Top Customer
@@ -338,45 +336,114 @@ export const getTop3BestSellingProductsByDay = catchAsync(
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0); // Đặt thời gian bắt đầu của ngày hôm nay
     const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    todayEnd.setHours(23, 59, 59, 999); // Đặt thời gian kết thúc của ngày hôm nay
 
     const result = await Order.aggregate([
       {
         $match: {
-          createdAt: { $gte: todayStart, $lte: todayEnd },
-          status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] },
+          createdAt: { $gte: todayStart, $lte: todayEnd }, // Lọc đơn hàng trong ngày hôm nay
+          status: { $nin: ['Đã hủy', 'Hoàn đơn'] }, // Loại bỏ đơn hàng đã hủy và hoàn đơn
         },
       },
       {
-        $unwind: '$orderItems',
+        $unwind: '$orderItems', // Giải nén các orderItems (sản phẩm trong mỗi đơn hàng)
       },
       {
         $group: {
-          _id: '$orderItems.productId',
-          totalSold: { $sum: '$orderItems.quantity' },
+          _id: '$orderItems.productId', // Nhóm theo productId
+          totalSold: { $sum: '$orderItems.quantity' }, // Tổng số lượng bán được
+          totalRevenue: {
+            $sum: { $multiply: ['$orderItems.quantity', '$orderItems.price'] },
+          }, // Doanh thu dự kiến
         },
       },
       {
-        $sort: { totalSold: -1 },
+        $sort: { totalSold: -1 }, // Sắp xếp theo số lượng bán được, giảm dần
       },
       {
-        $limit: 3,
+        $limit: 3, // Lấy 3 sản phẩm bán chạy nhất
       },
       {
         $lookup: {
-          from: 'products',
+          from: 'products', // Tra cứu thông tin sản phẩm
           localField: '_id',
           foreignField: '_id',
           as: 'productInfo',
         },
       },
       {
-        $unwind: '$productInfo',
+        $unwind: '$productInfo', // Giải nén thông tin sản phẩm
       },
       {
         $project: {
           _id: 1,
           totalSold: 1,
+          totalRevenue: 1,
+          'productInfo.name': 1,
+          'productInfo.coverImg': 1,
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      status: 'success',
+      data: result,
+    });
+  }
+);
+export const getTop3BestSellingProductsByWeek = catchAsync(
+  async (req, res, next) => {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // Lấy ngày trong tuần (0-6, chủ nhật = 0)
+    const startOfWeek = new Date(today); // Bắt đầu từ ngày chủ nhật của tuần
+    startOfWeek.setDate(today.getDate() - dayOfWeek); // Tính ngày chủ nhật
+    startOfWeek.setHours(0, 0, 0, 0); // Đặt giờ là 00:00:00
+
+    const endOfWeek = new Date(startOfWeek); // Kết thúc tuần vào ngày chủ nhật kế tiếp
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // Tính ngày cuối tuần (thứ bảy)
+    endOfWeek.setHours(23, 59, 59, 999); // Đặt giờ là 23:59:59
+
+    const result = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfWeek, $lte: endOfWeek }, // Lọc đơn hàng trong tuần hiện tại
+          status: { $nin: ['Đã hủy', 'Hoàn đơn'] }, // Loại bỏ đơn hàng đã hủy và hoàn đơn
+        },
+      },
+      {
+        $unwind: '$orderItems', // Giải nén các orderItems (sản phẩm trong mỗi đơn hàng)
+      },
+      {
+        $group: {
+          _id: '$orderItems.productId', // Nhóm theo productId
+          totalSold: { $sum: '$orderItems.quantity' }, // Tổng số lượng bán được
+          totalRevenue: {
+            $sum: { $multiply: ['$orderItems.quantity', '$orderItems.price'] },
+          }, // Doanh thu dự kiến
+        },
+      },
+      {
+        $sort: { totalSold: -1 }, // Sắp xếp theo số lượng bán được, giảm dần
+      },
+      {
+        $limit: 3, // Lấy 3 sản phẩm bán chạy nhất
+      },
+      {
+        $lookup: {
+          from: 'products', // Tra cứu thông tin sản phẩm
+          localField: '_id',
+          foreignField: '_id',
+          as: 'productInfo',
+        },
+      },
+      {
+        $unwind: '$productInfo', // Giải nén thông tin sản phẩm
+      },
+      {
+        $project: {
+          _id: 1,
+          totalSold: 1,
+          totalRevenue: 1,
           'productInfo.name': 1,
           'productInfo.coverImg': 1,
         },
@@ -390,122 +457,56 @@ export const getTop3BestSellingProductsByDay = catchAsync(
   }
 );
 
-export const getTop3BestSellingProductsByWeek = catchAsync(
-  async (req, res, next) => {
-    // Lấy ngày hiện tại
-    const today = new Date();
-
-    // Tính ngày đầu tuần (Thứ hai) của tuần hiện tại
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - today.getDay() + 1); // Chuyển sang thứ hai của tuần
-    weekStart.setHours(0, 0, 0, 0); // Đặt thời gian bắt đầu của ngày đầu tuần
-
-    // Tính ngày cuối tuần (Chủ nhật) của tuần hiện tại
-    const weekEnd = new Date(today);
-    weekEnd.setDate(today.getDate() - today.getDay() + 7); // Chuyển sang chủ nhật của tuần
-    weekEnd.setHours(23, 59, 59, 999); // Đặt thời gian kết thúc của ngày cuối tuần
-
-    // Lọc và nhóm đơn hàng theo tuần
-    const result = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: weekStart, $lte: weekEnd }, // Lọc đơn hàng trong tuần hiện tại
-          status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] }, // Lọc theo trạng thái đơn hàng
-        },
-      },
-      {
-        $unwind: '$orderItems', // Tách các mục trong giỏ hàng thành các phần tử riêng biệt
-      },
-      {
-        $group: {
-          _id: '$orderItems.productId', // Gộp theo ID sản phẩm
-          totalSold: { $sum: '$orderItems.quantity' }, // Tổng số lượng sản phẩm bán được
-        },
-      },
-      {
-        $sort: { totalSold: -1 }, // Sắp xếp theo số lượng bán được giảm dần
-      },
-      {
-        $limit: 3, // Lấy top 3 sản phẩm bán chạy nhất
-      },
-      {
-        $lookup: {
-          from: 'products', // Tên collection sản phẩm
-          localField: '_id', // Trường productId trong OrderItems sẽ nối với _id trong Products
-          foreignField: '_id', // Trường _id trong Products
-          as: 'productInfo', // Đặt tên cho kết quả nối là productInfo
-        },
-      },
-      {
-        $unwind: '$productInfo', // Tách mảng productInfo thành đối tượng để dễ truy cập
-      },
-      {
-        $project: {
-          _id: 1,
-          totalSold: 1,
-          'productInfo.name': 1,
-          'productInfo.coverImg': 1, // Lấy tên sản phẩm và ảnh bìa
-        },
-      },
-    ]);
-
-    // Trả kết quả về client
-    res.status(200).json({
-      status: 'success',
-      data: result,
-    });
-  }
-);
-
 export const getTop3BestSellingProductsByMonth = catchAsync(
   async (req, res, next) => {
     const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1); // Lấy ngày đầu tháng
+    startOfMonth.setHours(0, 0, 0, 0); // Đặt giờ là 00:00:00
 
-    // Đặt ngày bắt đầu là ngày đầu tiên của tháng hiện tại
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    monthStart.setHours(0, 0, 0, 0);
-
-    // Đặt ngày kết thúc là ngày cuối cùng của tháng hiện tại
-    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    monthEnd.setHours(23, 59, 59, 999);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Lấy ngày cuối tháng
+    endOfMonth.setHours(23, 59, 59, 999); // Đặt giờ là 23:59:59
 
     const result = await Order.aggregate([
       {
         $match: {
-          createdAt: { $gte: monthStart, $lte: monthEnd },
-          status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] },
+          createdAt: { $gte: startOfMonth, $lte: endOfMonth }, // Lọc đơn hàng trong tháng hiện tại
+          status: { $nin: ['Đã hủy', 'Hoàn đơn'] }, // Loại bỏ đơn hàng đã hủy và hoàn đơn
         },
       },
       {
-        $unwind: '$orderItems',
+        $unwind: '$orderItems', // Giải nén các orderItems (sản phẩm trong mỗi đơn hàng)
       },
       {
         $group: {
-          _id: '$orderItems.productId',
-          totalSold: { $sum: '$orderItems.quantity' },
+          _id: '$orderItems.productId', // Nhóm theo productId
+          totalSold: { $sum: '$orderItems.quantity' }, // Tổng số lượng bán được
+          totalRevenue: {
+            $sum: { $multiply: ['$orderItems.quantity', '$orderItems.price'] },
+          }, // Doanh thu dự kiến
         },
       },
       {
-        $sort: { totalSold: -1 },
+        $sort: { totalSold: -1 }, // Sắp xếp theo số lượng bán được, giảm dần
       },
       {
-        $limit: 3,
+        $limit: 3, // Lấy 3 sản phẩm bán chạy nhất
       },
       {
         $lookup: {
-          from: 'products',
+          from: 'products', // Tra cứu thông tin sản phẩm
           localField: '_id',
           foreignField: '_id',
           as: 'productInfo',
         },
       },
       {
-        $unwind: '$productInfo',
+        $unwind: '$productInfo', // Giải nén thông tin sản phẩm
       },
       {
         $project: {
           _id: 1,
           totalSold: 1,
+          totalRevenue: 1,
           'productInfo.name': 1,
           'productInfo.coverImg': 1,
         },
@@ -522,52 +523,53 @@ export const getTop3BestSellingProductsByMonth = catchAsync(
 export const getTop3BestSellingProductsByYear = catchAsync(
   async (req, res, next) => {
     const today = new Date();
+    const startOfYear = new Date(today.getFullYear(), 0, 1); // Lấy ngày đầu năm
+    startOfYear.setHours(0, 0, 0, 0); // Đặt giờ là 00:00:00
 
-    // Đặt ngày bắt đầu là ngày đầu tiên của năm hiện tại
-    const yearStart = new Date(today.getFullYear(), 0, 1);
-    yearStart.setHours(0, 0, 0, 0);
-
-    // Đặt ngày kết thúc là ngày cuối cùng của năm hiện tại
-    const yearEnd = new Date(today.getFullYear(), 11, 31);
-    yearEnd.setHours(23, 59, 59, 999);
+    const endOfYear = new Date(today.getFullYear(), 11, 31); // Lấy ngày cuối năm
+    endOfYear.setHours(23, 59, 59, 999); // Đặt giờ là 23:59:59
 
     const result = await Order.aggregate([
       {
         $match: {
-          createdAt: { $gte: yearStart, $lte: yearEnd },
-          status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] },
+          createdAt: { $gte: startOfYear, $lte: endOfYear }, // Lọc đơn hàng trong năm hiện tại
+          status: { $nin: ['Đã hủy', 'Hoàn đơn'] }, // Loại bỏ đơn hàng đã hủy và hoàn đơn
         },
       },
       {
-        $unwind: '$orderItems',
+        $unwind: '$orderItems', // Giải nén các orderItems (sản phẩm trong mỗi đơn hàng)
       },
       {
         $group: {
-          _id: '$orderItems.productId',
-          totalSold: { $sum: '$orderItems.quantity' },
+          _id: '$orderItems.productId', // Nhóm theo productId
+          totalSold: { $sum: '$orderItems.quantity' }, // Tổng số lượng bán được
+          totalRevenue: {
+            $sum: { $multiply: ['$orderItems.quantity', '$orderItems.price'] },
+          }, // Doanh thu dự kiến
         },
       },
       {
-        $sort: { totalSold: -1 },
+        $sort: { totalSold: -1 }, // Sắp xếp theo số lượng bán được, giảm dần
       },
       {
-        $limit: 3,
+        $limit: 3, // Lấy 3 sản phẩm bán chạy nhất
       },
       {
         $lookup: {
-          from: 'products',
+          from: 'products', // Tra cứu thông tin sản phẩm
           localField: '_id',
           foreignField: '_id',
           as: 'productInfo',
         },
       },
       {
-        $unwind: '$productInfo',
+        $unwind: '$productInfo', // Giải nén thông tin sản phẩm
       },
       {
         $project: {
           _id: 1,
           totalSold: 1,
+          totalRevenue: 1,
           'productInfo.name': 1,
           'productInfo.coverImg': 1,
         },
@@ -595,40 +597,44 @@ export const getTop3BestSellingProductsByRange = catchAsync(
     const result = await Order.aggregate([
       {
         $match: {
-          createdAt: { $gte: start, $lte: end },
-          status: { $in: ['Đã nhận được hàng', 'Đã giao hàng'] },
+          createdAt: { $gte: startDate, $lte: endDate }, // Lọc đơn hàng trong khoảng thời gian
+          status: { $nin: ['Đã hủy', 'Hoàn đơn'] }, // Loại bỏ đơn hàng đã hủy và hoàn đơn
         },
       },
       {
-        $unwind: '$orderItems',
+        $unwind: '$orderItems', // Giải nén các orderItems (sản phẩm trong mỗi đơn hàng)
       },
       {
         $group: {
-          _id: '$orderItems.productId',
-          totalSold: { $sum: '$orderItems.quantity' },
+          _id: '$orderItems.productId', // Nhóm theo productId
+          totalSold: { $sum: '$orderItems.quantity' }, // Tổng số lượng bán được
+          totalRevenue: {
+            $sum: { $multiply: ['$orderItems.quantity', '$orderItems.price'] },
+          }, // Doanh thu dự kiến
         },
       },
       {
-        $sort: { totalSold: -1 },
+        $sort: { totalSold: -1 }, // Sắp xếp theo số lượng bán được, giảm dần
       },
       {
-        $limit: 3,
+        $limit: 3, // Lấy 3 sản phẩm bán chạy nhất
       },
       {
         $lookup: {
-          from: 'products',
+          from: 'products', // Tra cứu thông tin sản phẩm
           localField: '_id',
           foreignField: '_id',
           as: 'productInfo',
         },
       },
       {
-        $unwind: '$productInfo',
+        $unwind: '$productInfo', // Giải nén thông tin sản phẩm
       },
       {
         $project: {
           _id: 1,
           totalSold: 1,
+          totalRevenue: 1,
           'productInfo.name': 1,
           'productInfo.coverImg': 1,
         },
@@ -647,31 +653,44 @@ export const getRevenueAndRefundsByDay = catchAsync(async (req, res, next) => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0); // Đặt thời gian bắt đầu của ngày hôm nay
   const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+  todayEnd.setHours(23, 59, 59, 999); // Đặt thời gian kết thúc của ngày hôm nay
 
   const result = await Order.aggregate([
     {
       $match: {
-        createdAt: { $gte: todayStart, $lte: todayEnd }, // Lọc theo ngày bắt đầu và kết thúc
+        createdAt: { $gte: todayStart, $lte: todayEnd }, // Lọc theo khoảng thời gian trong ngày
         status: { $in: ['Đã giao hàng', 'Đã nhận được hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
       },
     },
     {
       $group: {
         _id: null,
-        totalRevenue: { $sum: '$totalPrice' }, // Tính tổng doanh thu
+        totalRevenue: {
+          $sum: {
+            $cond: [
+              { $in: ['$status', ['Đã giao hàng', 'Đã nhận được hàng']] }, // Chỉ tính doanh thu từ các đơn đã giao hoặc đã nhận
+              '$totalPrice',
+              0,
+            ],
+          },
+        },
         totalRefund: {
           $sum: {
             $cond: [
-              { $eq: ['$status', 'Hoàn đơn'] }, // Nếu trạng thái đơn hàng là 'Hoàn đơn', tính bồi hoàn
-              60000, // Bồi hoàn 60000 cho đơn hoàn đơn
               {
-                $cond: [
-                  { $eq: ['$statusShip', true] }, // Nếu statusShip là true thì bồi hoàn 30000
-                  30000,
-                  0, // Nếu không phải thì không tính bồi hoàn
+                $and: [
+                  { $eq: ['$paymentMethod', 'COD'] }, // Chỉ tính bồi hoàn nếu phương thức thanh toán là COD
+                  { $eq: ['$status', 'Hoàn đơn'] },
                 ],
               },
+              {
+                $cond: [
+                  { $eq: ['$statusShip', true] }, // Nếu statusShip là true thì +30000
+                  30000,
+                  60000, // Nếu statusShip là false thì +60000
+                ],
+              },
+              0, // Nếu không phải thì không tính bồi hoàn
             ],
           },
         },
@@ -680,8 +699,8 @@ export const getRevenueAndRefundsByDay = catchAsync(async (req, res, next) => {
     {
       $project: {
         _id: 0,
-        totalRevenue: 1,
-        totalRefund: 1,
+        totalRevenue: 1, // Tổng doanh thu
+        totalRefund: 1, // Tổng bồi hoàn
         totalRealRevenue: {
           $subtract: ['$totalRevenue', '$totalRefund'], // Tính thực nhận (doanh thu - bồi hoàn)
         },
@@ -719,19 +738,32 @@ export const getRevenueAndRefundsByWeek = catchAsync(async (req, res, next) => {
     {
       $group: {
         _id: null,
-        totalRevenue: { $sum: '$totalPrice' }, // Tính tổng doanh thu
+        totalRevenue: {
+          $sum: {
+            $cond: [
+              { $in: ['$status', ['Đã giao hàng', 'Đã nhận được hàng']] }, // Chỉ tính doanh thu từ các đơn đã giao hoặc đã nhận
+              '$totalPrice',
+              0,
+            ],
+          },
+        },
         totalRefund: {
           $sum: {
             $cond: [
-              { $eq: ['$status', 'Hoàn đơn'] }, // Nếu trạng thái đơn hàng là 'Hoàn đơn', tính bồi hoàn
-              60000, // Bồi hoàn 60000 cho đơn hoàn đơn
               {
-                $cond: [
-                  { $eq: ['$statusShip', true] }, // Nếu statusShip là true thì bồi hoàn 30000
-                  30000,
-                  0, // Nếu không phải thì không tính bồi hoàn
+                $and: [
+                  { $eq: ['$paymentMethod', 'COD'] }, // Chỉ tính bồi hoàn nếu phương thức thanh toán là COD
+                  { $eq: ['$status', 'Hoàn đơn'] },
                 ],
               },
+              {
+                $cond: [
+                  { $eq: ['$statusShip', true] }, // Nếu statusShip là true thì +30000
+                  30000,
+                  60000, // Nếu statusShip là false thì +60000
+                ],
+              },
+              0, // Nếu không phải thì không tính bồi hoàn
             ],
           },
         },
@@ -740,8 +772,8 @@ export const getRevenueAndRefundsByWeek = catchAsync(async (req, res, next) => {
     {
       $project: {
         _id: 0,
-        totalRevenue: 1,
-        totalRefund: 1,
+        totalRevenue: 1, // Tổng doanh thu
+        totalRefund: 1, // Tổng bồi hoàn
         totalRealRevenue: {
           $subtract: ['$totalRevenue', '$totalRefund'], // Tính thực nhận (doanh thu - bồi hoàn)
         },
@@ -757,6 +789,7 @@ export const getRevenueAndRefundsByWeek = catchAsync(async (req, res, next) => {
 
 export const getRevenueAndRefundsByMonth = catchAsync(
   async (req, res, next) => {
+    // Lấy ngày hiện tại
     const today = new Date();
 
     // Đặt ngày bắt đầu là ngày đầu tiên của tháng hiện tại
@@ -777,19 +810,32 @@ export const getRevenueAndRefundsByMonth = catchAsync(
       {
         $group: {
           _id: null,
-          totalRevenue: { $sum: '$totalPrice' }, // Tính tổng doanh thu
+          totalRevenue: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['Đã giao hàng', 'Đã nhận được hàng']] }, // Chỉ tính doanh thu từ các đơn đã giao hoặc đã nhận
+                '$totalPrice',
+                0,
+              ],
+            },
+          },
           totalRefund: {
             $sum: {
               $cond: [
-                { $eq: ['$status', 'Hoàn đơn'] }, // Nếu trạng thái đơn hàng là 'Hoàn đơn', tính bồi hoàn
-                60000, // Bồi hoàn 60000 cho đơn hoàn đơn
                 {
-                  $cond: [
-                    { $eq: ['$statusShip', true] }, // Nếu statusShip là true thì bồi hoàn 30000
-                    30000,
-                    0, // Nếu không phải thì không tính bồi hoàn
+                  $and: [
+                    { $eq: ['$paymentMethod', 'COD'] }, // Chỉ tính bồi hoàn nếu phương thức thanh toán là COD
+                    { $eq: ['$status', 'Hoàn đơn'] },
                   ],
                 },
+                {
+                  $cond: [
+                    { $eq: ['$statusShip', true] }, // Nếu statusShip là true thì +30000
+                    30000,
+                    60000, // Nếu statusShip là false thì +60000
+                  ],
+                },
+                0, // Nếu không phải thì không tính bồi hoàn
               ],
             },
           },
@@ -798,8 +844,8 @@ export const getRevenueAndRefundsByMonth = catchAsync(
       {
         $project: {
           _id: 0,
-          totalRevenue: 1,
-          totalRefund: 1,
+          totalRevenue: 1, // Tổng doanh thu
+          totalRefund: 1, // Tổng bồi hoàn
           totalRealRevenue: {
             $subtract: ['$totalRevenue', '$totalRefund'], // Tính thực nhận (doanh thu - bồi hoàn)
           },
@@ -815,14 +861,15 @@ export const getRevenueAndRefundsByMonth = catchAsync(
 );
 
 export const getRevenueAndRefundsByYear = catchAsync(async (req, res, next) => {
+  // Lấy ngày hiện tại
   const today = new Date();
 
   // Đặt ngày bắt đầu là ngày đầu tiên của năm hiện tại
-  const yearStart = new Date(today.getFullYear(), 0, 1); // 0 là tháng 1 (tháng đầu tiên)
+  const yearStart = new Date(today.getFullYear(), 0, 1); // Tháng 0 là tháng 1
   yearStart.setHours(0, 0, 0, 0);
 
   // Đặt ngày kết thúc là ngày cuối cùng của năm hiện tại
-  const yearEnd = new Date(today.getFullYear(), 11, 31); // 11 là tháng 12 (tháng cuối cùng)
+  const yearEnd = new Date(today.getFullYear(), 11, 31); // Tháng 11 là tháng 12
   yearEnd.setHours(23, 59, 59, 999);
 
   const result = await Order.aggregate([
@@ -835,19 +882,32 @@ export const getRevenueAndRefundsByYear = catchAsync(async (req, res, next) => {
     {
       $group: {
         _id: null,
-        totalRevenue: { $sum: '$totalPrice' }, // Tính tổng doanh thu
+        totalRevenue: {
+          $sum: {
+            $cond: [
+              { $in: ['$status', ['Đã giao hàng', 'Đã nhận được hàng']] }, // Chỉ tính doanh thu từ các đơn đã giao hoặc đã nhận
+              '$totalPrice',
+              0,
+            ],
+          },
+        },
         totalRefund: {
           $sum: {
             $cond: [
-              { $eq: ['$status', 'Hoàn đơn'] }, // Nếu trạng thái đơn hàng là 'Hoàn đơn', tính bồi hoàn
-              60000, // Bồi hoàn 60000 cho đơn hoàn đơn
               {
-                $cond: [
-                  { $eq: ['$statusShip', true] }, // Nếu statusShip là true thì bồi hoàn 30000
-                  30000,
-                  0, // Nếu không phải thì không tính bồi hoàn
+                $and: [
+                  { $eq: ['$paymentMethod', 'COD'] }, // Chỉ tính bồi hoàn nếu phương thức thanh toán là COD
+                  { $eq: ['$status', 'Hoàn đơn'] },
                 ],
               },
+              {
+                $cond: [
+                  { $eq: ['$statusShip', true] }, // Nếu statusShip là true thì +30000
+                  30000,
+                  60000, // Nếu statusShip là false thì +60000
+                ],
+              },
+              0, // Nếu không phải thì không tính bồi hoàn
             ],
           },
         },
@@ -856,8 +916,8 @@ export const getRevenueAndRefundsByYear = catchAsync(async (req, res, next) => {
     {
       $project: {
         _id: 0,
-        totalRevenue: 1,
-        totalRefund: 1,
+        totalRevenue: 1, // Tổng doanh thu
+        totalRefund: 1, // Tổng bồi hoàn
         totalRealRevenue: {
           $subtract: ['$totalRevenue', '$totalRefund'], // Tính thực nhận (doanh thu - bồi hoàn)
         },
@@ -876,35 +936,50 @@ export const getRevenueAndRefundsByRange = catchAsync(
     const { startDate, endDate } = req.query;
     const start = new Date(startDate);
     const end = new Date(endDate);
+
     if (isNaN(start) || isNaN(end)) {
       return res.status(400).json({
         status: 'error',
         message: 'Dữ liệu không đúng định dạng.',
       });
     }
+
     const result = await Order.aggregate([
       {
         $match: {
-          createdAt: { $gte: start, $lte: end }, // Lọc theo ngày bắt đầu và kết thúc
+          createdAt: { $gte: start, $lte: end }, // Lọc theo khoảng thời gian
           status: { $in: ['Đã giao hàng', 'Đã nhận được hàng', 'Hoàn đơn'] }, // Lọc theo trạng thái đơn hàng
         },
       },
       {
         $group: {
           _id: null,
-          totalRevenue: { $sum: '$totalPrice' }, // Tính tổng doanh thu
+          totalRevenue: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['Đã giao hàng', 'Đã nhận được hàng']] },
+                '$totalPrice',
+                0,
+              ],
+            },
+          },
           totalRefund: {
             $sum: {
               $cond: [
-                { $eq: ['$status', 'Hoàn đơn'] }, // Nếu trạng thái đơn hàng là 'Hoàn đơn', tính bồi hoàn
-                60000, // Bồi hoàn 60000 cho đơn hoàn đơn
                 {
-                  $cond: [
-                    { $eq: ['$statusShip', true] }, // Nếu statusShip là true thì bồi hoàn 30000
-                    30000,
-                    0, // Nếu không phải thì không tính bồi hoàn
+                  $and: [
+                    { $eq: ['$paymentMethod', 'COD'] }, // Chỉ tính bồi hoàn nếu phương thức thanh toán là COD
+                    { $eq: ['$status', 'Hoàn đơn'] },
                   ],
                 },
+                {
+                  $cond: [
+                    { $eq: ['$statusShip', true] }, // Nếu statusShip là true thì +30000
+                    30000,
+                    60000, // Nếu statusShip là false thì +60000
+                  ],
+                },
+                0, // Nếu không phải thì không tính bồi hoàn
               ],
             },
           },
@@ -913,8 +988,8 @@ export const getRevenueAndRefundsByRange = catchAsync(
       {
         $project: {
           _id: 0,
-          totalRevenue: 1,
-          totalRefund: 1,
+          totalRevenue: 1, // Tổng doanh thu
+          totalRefund: 1, // Tổng bồi hoàn
           totalRealRevenue: {
             $subtract: ['$totalRevenue', '$totalRefund'], // Tính thực nhận (doanh thu - bồi hoàn)
           },
@@ -1001,13 +1076,26 @@ export const getOrderStatusRatioByDay = catchAsync(async (req, res, next) => {
   // Tính tỷ lệ phần trăm cho từng trạng thái
   const statusWithPercent = result.map((status) => ({
     status: status.status,
-    percentage: ((status.count / totalOrders) * 100).toFixed(1), // Tính tỷ lệ phần trăm
+    count: status.count,
+    percentage: (status.count / totalOrders) * 100, // Tính tỷ lệ phần trăm
+  }));
+
+  // Tính tổng tỷ lệ phần trăm để tránh vượt 100%
+  const totalPercentage = statusWithPercent.reduce(
+    (sum, status) => sum + status.percentage,
+    0
+  );
+
+  // Cập nhật tỷ lệ phần trăm sau khi tính tổng
+  const statusWithFinalPercent = statusWithPercent.map((status) => ({
+    ...status,
+    percentage: ((status.percentage / totalPercentage) * 100).toFixed(1), // Điều chỉnh tỷ lệ phần trăm
   }));
 
   // Trả kết quả
   res.status(200).json({
     status: 'success',
-    data: statusWithPercent,
+    data: statusWithFinalPercent,
   });
 });
 
@@ -1089,13 +1177,26 @@ export const getOrderStatusRatioByWeek = catchAsync(async (req, res, next) => {
   // Tính tỷ lệ phần trăm cho từng trạng thái
   const statusWithPercent = result.map((status) => ({
     status: status.status,
-    percentage: ((status.count / totalOrders) * 100).toFixed(1), // Tính tỷ lệ phần trăm
+    count: status.count,
+    percentage: (status.count / totalOrders) * 100, // Tính tỷ lệ phần trăm mà không làm tròn
+  }));
+
+  // Tính tổng tỷ lệ phần trăm để tránh vượt 100%
+  const totalPercentage = statusWithPercent.reduce(
+    (sum, status) => sum + status.percentage,
+    0
+  );
+
+  // Cập nhật tỷ lệ phần trăm sau khi tính tổng
+  const statusWithFinalPercent = statusWithPercent.map((status) => ({
+    ...status,
+    percentage: ((status.percentage / totalPercentage) * 100).toFixed(1), // Điều chỉnh tỷ lệ phần trăm
   }));
 
   // Trả kết quả
   res.status(200).json({
     status: 'success',
-    data: statusWithPercent,
+    data: statusWithFinalPercent,
   });
 });
 
@@ -1174,13 +1275,26 @@ export const getOrderStatusRatioByMonth = catchAsync(async (req, res, next) => {
   // Tính tỷ lệ phần trăm cho từng trạng thái
   const statusWithPercent = result.map((status) => ({
     status: status.status,
-    percentage: ((status.count / totalOrders) * 100).toFixed(1), // Tính tỷ lệ phần trăm
+    count: status.count,
+    percentage: (status.count / totalOrders) * 100, // Tính tỷ lệ phần trăm mà không làm tròn
+  }));
+
+  // Tính tổng tỷ lệ phần trăm để tránh vượt 100%
+  const totalPercentage = statusWithPercent.reduce(
+    (sum, status) => sum + status.percentage,
+    0
+  );
+
+  // Cập nhật tỷ lệ phần trăm sau khi tính tổng
+  const statusWithFinalPercent = statusWithPercent.map((status) => ({
+    ...status,
+    percentage: ((status.percentage / totalPercentage) * 100).toFixed(1), // Điều chỉnh tỷ lệ phần trăm
   }));
 
   // Trả kết quả
   res.status(200).json({
     status: 'success',
-    data: statusWithPercent,
+    data: statusWithFinalPercent,
   });
 });
 
@@ -1259,13 +1373,26 @@ export const getOrderStatusRatioByYear = catchAsync(async (req, res, next) => {
   // Tính tỷ lệ phần trăm cho từng trạng thái
   const statusWithPercent = result.map((status) => ({
     status: status.status,
-    percentage: ((status.count / totalOrders) * 100).toFixed(1), // Tính tỷ lệ phần trăm
+    count: status.count,
+    percentage: (status.count / totalOrders) * 100, // Tính tỷ lệ phần trăm mà không làm tròn ngay
+  }));
+
+  // Tính tổng tỷ lệ phần trăm để tránh vượt 100%
+  const totalPercentage = statusWithPercent.reduce(
+    (sum, status) => sum + status.percentage,
+    0
+  );
+
+  // Cập nhật tỷ lệ phần trăm sau khi tính tổng
+  const statusWithFinalPercent = statusWithPercent.map((status) => ({
+    ...status,
+    percentage: ((status.percentage / totalPercentage) * 100).toFixed(1), // Điều chỉnh tỷ lệ phần trăm
   }));
 
   // Trả kết quả
   res.status(200).json({
     status: 'success',
-    data: statusWithPercent,
+    data: statusWithFinalPercent,
   });
 });
 
@@ -1273,6 +1400,8 @@ export const getOrderStatusRatioByRange = catchAsync(async (req, res, next) => {
   const { startDate, endDate } = req.query;
   const start = new Date(startDate);
   const end = new Date(endDate);
+
+  // Kiểm tra định dạng ngày
   if (isNaN(start) || isNaN(end)) {
     return res.status(400).json({
       status: 'error',
@@ -1325,7 +1454,7 @@ export const getOrderStatusRatioByRange = catchAsync(async (req, res, next) => {
     },
   ]);
 
-  // Đếm tổng số đơn hàng
+  // Đếm tổng số đơn hàng trong khoảng thời gian
   const totalOrders = await Order.countDocuments({
     createdAt: { $gte: start, $lte: end },
     status: {
@@ -1345,13 +1474,26 @@ export const getOrderStatusRatioByRange = catchAsync(async (req, res, next) => {
   // Tính tỷ lệ phần trăm cho từng trạng thái
   const statusWithPercent = result.map((status) => ({
     status: status.status,
-    percentage: ((status.count / totalOrders) * 100).toFixed(1), // Tính tỷ lệ phần trăm
+    count: status.count,
+    percentage: (status.count / totalOrders) * 100, // Tính tỷ lệ phần trăm mà không làm tròn ngay
+  }));
+
+  // Tính tổng tỷ lệ phần trăm để tránh vượt 100%
+  const totalPercentage = statusWithPercent.reduce(
+    (sum, status) => sum + status.percentage,
+    0
+  );
+
+  // Cập nhật tỷ lệ phần trăm sau khi tính tổng
+  const statusWithFinalPercent = statusWithPercent.map((status) => ({
+    ...status,
+    percentage: ((status.percentage / totalPercentage) * 100).toFixed(1), // Điều chỉnh tỷ lệ phần trăm
   }));
 
   // Trả kết quả
   res.status(200).json({
     status: 'success',
-    data: statusWithPercent,
+    data: statusWithFinalPercent,
   });
 });
 
@@ -1361,50 +1503,75 @@ export const getTop3ProductsByInventoryByDay = catchAsync(
   async (req, res, next) => {
     // Lấy ngày hiện tại
     const today = new Date();
-    const dayOfWeek = today.getDay(); // Lấy số ngày trong tuần (0: Chủ Nhật, 1: Thứ Hai, ..., 6: Thứ Bảy)
+    today.setHours(0, 0, 0, 0); // Đặt thời gian về 00:00:00 (bắt đầu ngày hôm nay)
 
-    // Tính ngày đầu tuần (Chủ Nhật)
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - dayOfWeek); // Trừ đi số ngày trong tuần để đến Chủ Nhật
-    startOfWeek.setHours(0, 0, 0, 0); // Đặt thời gian về 00:00:00
+    // Lấy cuối ngày hôm nay (23:59:59)
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
 
-    // Tính ngày cuối tuần (Thứ Bảy)
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6); // Cộng thêm 6 ngày để đến Thứ Bảy
-    endOfWeek.setHours(23, 59, 59, 999); // Đặt thời gian kết thúc của ngày cuối tuần
+    // Lấy các đơn hàng chưa hủy và chưa hoàn trong ngày hiện tại
+    const orders = await Order.find({
+      status: { $nin: ['Hoàn đơn', 'Đã hủy'] },
+      createdAt: { $gte: today, $lt: endOfDay }, // Lọc đơn hàng trong ngày hiện tại
+    }).populate('orderItems.productId');
 
-    const result = await Product.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startOfWeek, $lt: endOfWeek }, // Lọc sản phẩm theo tuần hiện tại
-        },
-      },
-      {
-        $unwind: '$variants', // Tách mảng variants để xử lý từng variant
-      },
-      {
-        $unwind: '$variants.sizes', // Tách mảng sizes để xử lý từng size của variant
-      },
-      {
-        $group: {
-          _id: '$_id', // Nhóm theo sản phẩm (ID sản phẩm)
-          totalInventory: { $sum: '$variants.sizes.inventory' }, // Tính tổng inventory của sản phẩm (từ tất cả các variants và sizes)
-          name: { $first: '$name' }, // Lấy tên sản phẩm
-          coverImg: { $first: '$coverImg' }, // Lấy ảnh bìa của sản phẩm
-          slug: { $first: '$slug' }, // Lấy slug của sản phẩm
-        },
-      },
-      {
-        $sort: { totalInventory: -1 }, // Sắp xếp giảm dần theo tổng tồn kho
-      },
-      {
-        $limit: 3, // Lấy top 3 sản phẩm có tồn kho cao nhất
-      },
-    ]);
+    // Tính toán số lượng bán ra cho từng sản phẩm
+    const productSales = {};
+
+    orders.forEach((order) => {
+      order.orderItems.forEach((item) => {
+        const productId = item.productId._id.toString();
+        const quantitySold = item.quantity;
+
+        // Cộng dồn số lượng bán ra cho mỗi sản phẩm
+        if (!productSales[productId]) {
+          productSales[productId] = 0;
+        }
+        productSales[productId] += quantitySold; // Cộng thêm số lượng bán cho sản phẩm
+      });
+    });
+
+    // Lấy tất cả sản phẩm và tính toán tồn kho
+    const products = await Product.find();
+
+    // Tính tồn kho cho từng sản phẩm và số lượng bán ra
+    const productStock = products.map((product) => {
+      let totalStock = 0;
+      let totalSold = 0;
+
+      product.variants.forEach((variant) => {
+        variant.sizes.forEach((size) => {
+          totalStock += size.inventory; // Tổng số lượng ban đầu
+        });
+      });
+
+      // Lấy số lượng bán ra cho sản phẩm hiện tại từ productSales
+      totalSold = productSales[product._id.toString()] || 0;
+
+      const stockPercentage =
+        totalStock === 0
+          ? 100
+          : Math.max(0, (totalStock - totalSold) / totalStock) * 100;
+
+      return {
+        productId: product._id,
+        name: product.name,
+        coverImg: product.coverImg,
+        slug: product.slug,
+        stockPercentage,
+        totalStock,
+        totalSold,
+      };
+    });
+
+    // Sắp xếp sản phẩm theo tồn kho giảm dần
+    const topProducts = productStock
+      .sort((a, b) => b.stockPercentage - a.stockPercentage)
+      .slice(0, 3); // Lấy 3 sản phẩm đầu tiên
 
     res.status(200).json({
       status: 'success',
-      data: result,
+      data: topProducts,
     });
   }
 );
@@ -1425,38 +1592,69 @@ export const getTop3ProductsByInventoryByWeek = catchAsync(
     endOfWeek.setDate(startOfWeek.getDate() + 6); // Cộng thêm 6 ngày để đến Thứ Bảy
     endOfWeek.setHours(23, 59, 59, 999); // Đặt thời gian kết thúc của ngày cuối tuần
 
-    const result = await Product.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startOfWeek, $lt: endOfWeek }, // Lọc sản phẩm theo tuần hiện tại
-        },
-      },
-      {
-        $unwind: '$variants', // Tách mảng variants để xử lý từng variant
-      },
-      {
-        $unwind: '$variants.sizes', // Tách mảng sizes để xử lý từng size của variant
-      },
-      {
-        $group: {
-          _id: '$_id', // Nhóm theo sản phẩm (ID sản phẩm)
-          totalInventory: { $sum: '$variants.sizes.inventory' }, // Tính tổng inventory của sản phẩm (từ tất cả các variants và sizes)
-          name: { $first: '$name' }, // Lấy tên sản phẩm
-          coverImg: { $first: '$coverImg' }, // Lấy ảnh bìa của sản phẩm
-          slug: { $first: '$slug' }, // Lấy slug của sản phẩm
-        },
-      },
-      {
-        $sort: { totalInventory: -1 }, // Sắp xếp giảm dần theo tổng tồn kho
-      },
-      {
-        $limit: 3, // Lấy top 3 sản phẩm có tồn kho cao nhất
-      },
-    ]);
+    // Lấy các đơn hàng chưa hủy và chưa hoàn trong tuần hiện tại
+    const orders = await Order.find({
+      status: { $nin: ['Hoàn đơn', 'Đã hủy'] },
+      createdAt: { $gte: startOfWeek, $lt: endOfWeek }, // Lọc đơn hàng trong tuần hiện tại
+    }).populate('orderItems.productId');
+
+    // Tính toán số lượng bán ra cho từng sản phẩm
+    const productSales = {};
+
+    orders.forEach((order) => {
+      order.orderItems.forEach((item) => {
+        const productId = item.productId._id.toString();
+        const quantitySold = item.quantity;
+
+        // Cộng dồn số lượng bán ra cho mỗi sản phẩm
+        if (!productSales[productId]) {
+          productSales[productId] = 0;
+        }
+        productSales[productId] += quantitySold; // Cộng thêm số lượng bán cho sản phẩm
+      });
+    });
+
+    // Lấy tất cả sản phẩm và tính toán tồn kho
+    const products = await Product.find();
+
+    // Tính tồn kho cho từng sản phẩm và số lượng bán ra
+    const productStock = products.map((product) => {
+      let totalStock = 0;
+      let totalSold = 0;
+
+      product.variants.forEach((variant) => {
+        variant.sizes.forEach((size) => {
+          totalStock += size.inventory; // Tổng số lượng ban đầu
+        });
+      });
+
+      // Lấy số lượng bán ra cho sản phẩm hiện tại từ productSales
+      totalSold = productSales[product._id.toString()] || 0;
+
+      const stockPercentage =
+        totalStock === 0
+          ? 100
+          : Math.max(0, (totalStock - totalSold) / totalStock) * 100;
+
+      return {
+        productId: product._id,
+        name: product.name,
+        coverImg: product.coverImg,
+        slug: product.slug,
+        stockPercentage,
+        totalStock,
+        totalSold,
+      };
+    });
+
+    // Sắp xếp sản phẩm theo tồn kho giảm dần
+    const topProducts = productStock
+      .sort((a, b) => b.stockPercentage - a.stockPercentage)
+      .slice(0, 3); // Lấy 3 sản phẩm đầu tiên
 
     res.status(200).json({
       status: 'success',
-      data: result,
+      data: topProducts,
     });
   }
 );
@@ -1467,45 +1665,76 @@ export const getTop3ProductsByInventoryByMonth = catchAsync(
     const today = new Date();
 
     // Tính ngày đầu tháng
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1); // Ngày đầu tiên của tháng
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1); // Ngày đầu tháng
     startOfMonth.setHours(0, 0, 0, 0); // Đặt thời gian về 00:00:00
 
     // Tính ngày cuối tháng
-    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Ngày cuối cùng của tháng
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Ngày cuối tháng
     endOfMonth.setHours(23, 59, 59, 999); // Đặt thời gian kết thúc của ngày cuối tháng
 
-    const result = await Product.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startOfMonth, $lt: endOfMonth }, // Lọc sản phẩm theo tháng hiện tại
-        },
-      },
-      {
-        $unwind: '$variants', // Tách mảng variants để xử lý từng variant
-      },
-      {
-        $unwind: '$variants.sizes', // Tách mảng sizes để xử lý từng size của variant
-      },
-      {
-        $group: {
-          _id: '$_id', // Nhóm theo sản phẩm (ID sản phẩm)
-          totalInventory: { $sum: '$variants.sizes.inventory' }, // Tính tổng inventory của sản phẩm (từ tất cả các variants và sizes)
-          name: { $first: '$name' }, // Lấy tên sản phẩm
-          coverImg: { $first: '$coverImg' }, // Lấy ảnh bìa của sản phẩm
-          slug: { $first: '$slug' }, // Lấy slug của sản phẩm
-        },
-      },
-      {
-        $sort: { totalInventory: -1 }, // Sắp xếp giảm dần theo tổng tồn kho
-      },
-      {
-        $limit: 3, // Lấy top 3 sản phẩm có tồn kho cao nhất
-      },
-    ]);
+    // Lấy các đơn hàng chưa hủy và chưa hoàn trong tháng hiện tại
+    const orders = await Order.find({
+      status: { $nin: ['Hoàn đơn', 'Đã hủy'] },
+      createdAt: { $gte: startOfMonth, $lt: endOfMonth }, // Lọc đơn hàng trong tháng hiện tại
+    }).populate('orderItems.productId');
+
+    // Tính toán số lượng bán ra cho từng sản phẩm
+    const productSales = {};
+
+    orders.forEach((order) => {
+      order.orderItems.forEach((item) => {
+        const productId = item.productId._id.toString();
+        const quantitySold = item.quantity;
+
+        // Cộng dồn số lượng bán ra cho mỗi sản phẩm
+        if (!productSales[productId]) {
+          productSales[productId] = 0;
+        }
+        productSales[productId] += quantitySold; // Cộng thêm số lượng bán cho sản phẩm
+      });
+    });
+
+    // Lấy tất cả sản phẩm và tính toán tồn kho
+    const products = await Product.find();
+
+    // Tính tồn kho cho từng sản phẩm và số lượng bán ra
+    const productStock = products.map((product) => {
+      let totalStock = 0;
+      let totalSold = 0;
+
+      product.variants.forEach((variant) => {
+        variant.sizes.forEach((size) => {
+          totalStock += size.inventory; // Tổng số lượng ban đầu
+        });
+      });
+
+      // Lấy số lượng bán ra cho sản phẩm hiện tại từ productSales
+      totalSold = productSales[product._id.toString()] || 0;
+
+      const stockPercentage =
+        totalStock === 0
+          ? 100
+          : Math.max(0, (totalStock - totalSold) / totalStock) * 100;
+
+      return {
+        productId: product._id,
+        name: product.name,
+        coverImg: product.coverImg,
+        slug: product.slug,
+        stockPercentage,
+        totalStock,
+        totalSold,
+      };
+    });
+
+    // Sắp xếp sản phẩm theo tồn kho giảm dần
+    const topProducts = productStock
+      .sort((a, b) => b.stockPercentage - a.stockPercentage)
+      .slice(0, 3); // Lấy 3 sản phẩm đầu tiên
 
     res.status(200).json({
       status: 'success',
-      data: result,
+      data: topProducts,
     });
   }
 );
@@ -1516,45 +1745,76 @@ export const getTop3ProductsByInventoryByYear = catchAsync(
     const today = new Date();
 
     // Tính ngày đầu năm
-    const startOfYear = new Date(today.getFullYear(), 0, 1); // Ngày đầu tiên của năm
+    const startOfYear = new Date(today.getFullYear(), 0, 1); // Ngày đầu năm
     startOfYear.setHours(0, 0, 0, 0); // Đặt thời gian về 00:00:00
 
     // Tính ngày cuối năm
-    const endOfYear = new Date(today.getFullYear(), 11, 31); // Ngày cuối cùng của năm
+    const endOfYear = new Date(today.getFullYear(), 11, 31); // Ngày cuối năm
     endOfYear.setHours(23, 59, 59, 999); // Đặt thời gian kết thúc của ngày cuối năm
 
-    const result = await Product.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startOfYear, $lt: endOfYear }, // Lọc sản phẩm theo năm hiện tại
-        },
-      },
-      {
-        $unwind: '$variants', // Tách mảng variants để xử lý từng variant
-      },
-      {
-        $unwind: '$variants.sizes', // Tách mảng sizes để xử lý từng size của variant
-      },
-      {
-        $group: {
-          _id: '$_id', // Nhóm theo sản phẩm (ID sản phẩm)
-          totalInventory: { $sum: '$variants.sizes.inventory' }, // Tính tổng inventory của sản phẩm (từ tất cả các variants và sizes)
-          name: { $first: '$name' }, // Lấy tên sản phẩm
-          coverImg: { $first: '$coverImg' }, // Lấy ảnh bìa của sản phẩm
-          slug: { $first: '$slug' }, // Lấy slug của sản phẩm
-        },
-      },
-      {
-        $sort: { totalInventory: -1 }, // Sắp xếp giảm dần theo tổng tồn kho
-      },
-      {
-        $limit: 3, // Lấy top 3 sản phẩm có tồn kho cao nhất
-      },
-    ]);
+    // Lấy các đơn hàng chưa hủy và chưa hoàn trong năm hiện tại
+    const orders = await Order.find({
+      status: { $nin: ['Hoàn đơn', 'Đã hủy'] },
+      createdAt: { $gte: startOfYear, $lt: endOfYear }, // Lọc đơn hàng trong năm hiện tại
+    }).populate('orderItems.productId');
+
+    // Tính toán số lượng bán ra cho từng sản phẩm
+    const productSales = {};
+
+    orders.forEach((order) => {
+      order.orderItems.forEach((item) => {
+        const productId = item.productId._id.toString();
+        const quantitySold = item.quantity;
+
+        // Cộng dồn số lượng bán ra cho mỗi sản phẩm
+        if (!productSales[productId]) {
+          productSales[productId] = 0;
+        }
+        productSales[productId] += quantitySold; // Cộng thêm số lượng bán cho sản phẩm
+      });
+    });
+
+    // Lấy tất cả sản phẩm và tính toán tồn kho
+    const products = await Product.find();
+
+    // Tính tồn kho cho từng sản phẩm và số lượng bán ra
+    const productStock = products.map((product) => {
+      let totalStock = 0;
+      let totalSold = 0;
+
+      product.variants.forEach((variant) => {
+        variant.sizes.forEach((size) => {
+          totalStock += size.inventory; // Tổng số lượng ban đầu
+        });
+      });
+
+      // Lấy số lượng bán ra cho sản phẩm hiện tại từ productSales
+      totalSold = productSales[product._id.toString()] || 0;
+
+      const stockPercentage =
+        totalStock === 0
+          ? 100
+          : Math.max(0, (totalStock - totalSold) / totalStock) * 100;
+
+      return {
+        productId: product._id,
+        name: product.name,
+        coverImg: product.coverImg,
+        slug: product.slug,
+        stockPercentage,
+        totalStock,
+        totalSold,
+      };
+    });
+
+    // Sắp xếp sản phẩm theo tồn kho giảm dần
+    const topProducts = productStock
+      .sort((a, b) => b.stockPercentage - a.stockPercentage)
+      .slice(0, 3); // Lấy 3 sản phẩm đầu tiên
 
     res.status(200).json({
       status: 'success',
-      data: result,
+      data: topProducts,
     });
   }
 );
@@ -1572,38 +1832,68 @@ export const getTop3ProductsByInventoryByRange = catchAsync(
       });
     }
 
-    const result = await Product.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: start, $lt: end }, // Lọc sản phẩm theo ngày hiện tại
-        },
-      },
-      {
-        $unwind: '$variants', // Tách mảng variants để xử lý từng variant
-      },
-      {
-        $unwind: '$variants.sizes', // Tách mảng sizes để xử lý từng size của variant
-      },
-      {
-        $group: {
-          _id: '$_id', // Nhóm theo sản phẩm (ID sản phẩm)
-          totalInventory: { $sum: '$variants.sizes.inventory' }, // Tính tổng inventory của sản phẩm (từ tất cả các variants và sizes)
-          name: { $first: '$name' }, // Lấy tên sản phẩm
-          coverImg: { $first: '$coverImg' }, // Lấy ảnh bìa của sản phẩm
-          slug: { $first: '$slug' }, // Lấy slug của sản phẩm
-        },
-      },
-      {
-        $sort: { totalInventory: -1 }, // Sắp xếp giảm dần theo tổng tồn kho
-      },
-      {
-        $limit: 3, // Lấy top 3 sản phẩm có tồn kho cao nhất
-      },
-    ]);
+    const orders = await Order.find({
+      status: { $nin: ['Hoàn đơn', 'Đã hủy'] },
+      createdAt: { $gte: startDate, $lt: endDate }, // Lọc đơn hàng trong khoảng thời gian
+    }).populate('orderItems.productId');
+
+    // Tính toán số lượng bán ra cho từng sản phẩm
+    const productSales = {};
+
+    orders.forEach((order) => {
+      order.orderItems.forEach((item) => {
+        const productId = item.productId._id.toString();
+        const quantitySold = item.quantity;
+
+        // Cộng dồn số lượng bán ra cho mỗi sản phẩm
+        if (!productSales[productId]) {
+          productSales[productId] = 0;
+        }
+        productSales[productId] += quantitySold; // Cộng thêm số lượng bán cho sản phẩm
+      });
+    });
+
+    // Lấy tất cả sản phẩm và tính toán tồn kho
+    const products = await Product.find();
+
+    // Tính tồn kho cho từng sản phẩm và số lượng bán ra
+    const productStock = products.map((product) => {
+      let totalStock = 0;
+      let totalSold = 0;
+
+      product.variants.forEach((variant) => {
+        variant.sizes.forEach((size) => {
+          totalStock += size.inventory; // Tổng số lượng ban đầu
+        });
+      });
+
+      // Lấy số lượng bán ra cho sản phẩm hiện tại từ productSales
+      totalSold = productSales[product._id.toString()] || 0;
+
+      const stockPercentage =
+        totalStock === 0
+          ? 100
+          : Math.max(0, (totalStock - totalSold) / totalStock) * 100;
+
+      return {
+        productId: product._id,
+        name: product.name,
+        coverImg: product.coverImg,
+        slug: product.slug,
+        stockPercentage,
+        totalStock,
+        totalSold,
+      };
+    });
+
+    // Sắp xếp sản phẩm theo tồn kho giảm dần
+    const topProducts = productStock
+      .sort((a, b) => b.stockPercentage - a.stockPercentage)
+      .slice(0, 3); // Lấy 3 sản phẩm đầu tiên
 
     res.status(200).json({
       status: 'success',
-      data: result,
+      data: topProducts,
     });
   }
 );

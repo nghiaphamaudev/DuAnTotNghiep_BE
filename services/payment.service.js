@@ -187,7 +187,8 @@ export const paymentRedirect = async (req, res, next) => {
 
       if (voucher) {
         voucher.usedCount -= 1;
-        voucher.quantity += 1; // Giảm số lượng đã sử dụng
+        voucher.quantity += 1;
+        voucher.status = 'active'; // Giảm số lượng đã sử dụng
         await voucher.save();
       }
     }

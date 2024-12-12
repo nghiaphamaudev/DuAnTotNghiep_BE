@@ -62,9 +62,11 @@ const userSchema = new mongoose.Schema(
       required: true,
       default: 'Khác',
     },
-    blockReason: {
-      type: String,
-      required: false,
+    blockedDetail: {
+      blockReason: {
+        type: String,
+      },
+      handleBy: { type: String },
     },
     avatar: {
       type: String,
@@ -95,6 +97,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
       required: true,
+    },
+    paymentRestriction: {
+      type: Boolean,
+      default: false,
     },
     passwordChangedAt: Date,
     passwordResetToken: String,

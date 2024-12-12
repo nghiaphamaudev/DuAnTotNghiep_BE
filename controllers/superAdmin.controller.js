@@ -9,6 +9,8 @@ import {
   registerSuperAdminSchema,
 } from '../validator/user.validator';
 import { sendMaiBlockedOrder } from '../services/email.service';
+import Order from '../models/order.model';
+import { format } from 'date-fns';
 
 const signToken = (id) => {
   return jwt.sign({ id: id }, process.env.JWT_SECRET_ADMIN, {
@@ -132,11 +134,79 @@ export const getAllUserAccounts = catchAsync(async (req, res, next) => {
     totalPages: userPages,
   } = await getPaginatedData(User, page, limit);
 
+  // Lấy danh sách userId
+  const userIds = users.map((user) => user._id);
+
+  // Lấy thông tin đơn hàng theo userId
+  const orders = await Order.aggregate([
+    { $match: { userId: { $in: userIds } } },
+    {
+      $group: {
+        _id: '$userId',
+        totalOrders: {
+          $sum: {
+            $cond: {
+              if: {
+                $in: [
+                  '$status',
+                  [
+                    'Đang giao hàng',
+                    'Hoàn đơn',
+                    'Đã nhận được hàng',
+                    'Đã giao hàng',
+                  ],
+                ],
+              },
+              then: 1,
+              else: 0,
+            },
+          },
+        },
+        totalReturnOrders: {
+          $sum: {
+            $cond: { if: { $eq: ['$status', 'Hoàn đơn'] }, then: 1, else: 0 },
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        userId: '$_id',
+        totalOrders: 1,
+        totalReturnOrders: 1,
+        returnRate: {
+          $concat: [
+            { $toString: '$totalReturnOrders' },
+            '/',
+            { $toString: '$totalOrders' },
+          ],
+        },
+      },
+    },
+  ]);
+
+  // Gắn dữ liệu orders vào users
+  const userOrderData = users.map((user) => {
+    const orderData = orders.find(
+      (order) => String(order.userId) === String(user._id)
+    ) || {
+      totalOrders: 0,
+      totalReturnOrders: 0,
+      returnRate: '0/0',
+    };
+    return {
+      ...user.toObject(),
+      totalOrders: orderData.totalOrders,
+      totalReturnOrders: orderData.totalReturnOrders,
+      returnRate: orderData.returnRate,
+    };
+  });
+
   res.status(200).json({
     status: true,
     message: 'Thành công',
     data: {
-      list: users,
+      list: userOrderData,
       pagination: {
         currentPage: page,
         totalPages: userPages,
@@ -144,6 +214,138 @@ export const getAllUserAccounts = catchAsync(async (req, res, next) => {
         totalUsers,
       },
     },
+  });
+});
+
+export const getOrderStatistics = async (req, res, next) => {
+  try {
+    const userId = req.params.userId;
+
+    // Lấy tất cả các đơn hàng của người dùng
+    const orders = await Order.find({ userId });
+
+    if (!orders.length) {
+      return res.status(StatusCodes.OK).json({
+        message: 'Người dùng chưa có đơn hàng nào.',
+        data: {
+          totalOrders: 0,
+          completedOrders: '0/0 (0%)',
+          canceledOrders: '0/0 (0%)',
+          returnedOrders: '0/0 (0%)',
+          compensationCost: 0,
+        },
+      });
+    }
+
+    const totalOrders = orders.length;
+
+    // Tính toán các thông số
+    const completedOrders = orders.filter(
+      (order) => order.status === 'Đã nhận được hàng'
+    ).length;
+    const canceledOrders = orders.filter(
+      (order) => order.status === 'Đã hủy'
+    ).length;
+    const returnedOrders = orders.filter(
+      (order) => order.status === 'Hoàn đơn'
+    ).length;
+
+    const completedPercentage = ((completedOrders / totalOrders) * 100).toFixed(
+      2
+    );
+    const canceledPercentage = ((canceledOrders / totalOrders) * 100).toFixed(
+      2
+    );
+    const returnedPercentage = ((returnedOrders / totalOrders) * 100).toFixed(
+      2
+    );
+
+    // Tính toán tiền bồi hoàn
+    let compensationCost = 0;
+    orders.forEach((order) => {
+      if (order.status === 'Hoàn đơn' && order.paymentMethod === 'COD') {
+        compensationCost += order.statusShip ? 30000 : 60000;
+      }
+    });
+
+    // Kết quả trả về
+    return res.status(200).json({
+      message: 'Thống kê đơn hàng thành công',
+      data: {
+        totalOrders,
+        completedOrders: `${completedOrders}/${totalOrders} (${completedPercentage}%)`,
+        canceledOrders: `${canceledOrders}/${totalOrders} (${canceledPercentage}%)`,
+        returnedOrders: `${returnedOrders}/${totalOrders} (${returnedPercentage}%)`,
+        compensationCost,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const handleWarningUserAccount = catchAsync(async (req, res, next) => {
+  //sendEmail
+});
+
+export const updatePaymentRestriction = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+  const { restrictPayment } = req.body; // Giả sử body sẽ truyền true/false
+
+  // Kiểm tra người dùng có tồn tại không
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(
+      new AppError('Người dùng không tồn tại!', StatusCodes.NOT_FOUND)
+    );
+  }
+
+  // Cập nhật trạng thái 'paymentRestriction'
+  user.paymentRestriction = restrictPayment;
+  await user.save(); // Lưu thay đổi vào database
+
+  const message = restrictPayment
+    ? 'Đã yêu cầu người dùng thanh toán trước!'
+    : 'Đã hủy yêu cầu thanh toán trước!';
+
+  // Trả về kết quả
+  res.status(StatusCodes.OK).json({
+    status: 'success',
+    message: message,
+  });
+});
+
+export const blockedUserAccBySuperAdmin = catchAsync(async (req, res, next) => {
+  const idUser = req.params.idUser;
+  const { status, note } = req.body;
+  const user = await User.findOne({ _id: idUser });
+  if (!user)
+    return next(
+      new AppError('Tài khoản không tồn tại !', StatusCodes.BAD_REQUEST)
+    );
+
+  if (status === false && note) {
+    user.active = status;
+    user.blockedDetail.blockReason = note;
+    user.blockedDetail.handleBy = req.admin.fullName;
+
+    await user.save();
+    await sendMaiBlockedOrder(
+      user.email,
+      'Khoá tài khoản',
+      user.fullName,
+      note
+    );
+  } else {
+    user.active = status;
+    user.blockedDetail.blockReason = '';
+    user.blockedDetail.handleBy = '';
+    await user.save();
+  }
+
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Cập nhật trạng thái thành công!',
   });
 });
 
@@ -178,37 +380,6 @@ export const blockedAccBySuperAdmin = catchAsync(async (req, res, next) => {
     );
   admin.active = status;
   await admin.save();
-  res.status(StatusCodes.OK).json({
-    status: true,
-    message: 'Cập nhật trạng thái thành công!',
-  });
-});
-
-export const blockedUserAccBySuperAdmin = catchAsync(async (req, res, next) => {
-  const idUser = req.params.idUser;
-  const { status, note } = req.body;
-  const user = await User.findOne({ _id: idUser });
-  if (!user)
-    return next(
-      new AppError('Tài khoản không tồn tại !', StatusCodes.BAD_REQUEST)
-    );
-
-  if (status === false && note) {
-    user.active = status;
-    user.blockReason = note;
-    await user.save();
-    await sendMaiBlockedOrder(
-      user.email,
-      'Khoá tài khoản',
-      user.fullName,
-      note
-    );
-  } else {
-    user.active = status;
-    user.blockReason = '';
-    await user.save();
-  }
-
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'Cập nhật trạng thái thành công!',
@@ -256,5 +427,127 @@ export const getAdminById = catchAsync(async (req, res, next) => {
     status: true,
     message: 'Lấy thành công',
     data: admin,
+  });
+});
+
+//lọc đơn hàng theo đơn hàng của khách hàng theo tuần
+export const getOrdersByWeek = catchAsync(async (req, res, next) => {
+  const idUser = req.user.id;
+  const currentUser = req.user;
+
+  // Xác định phạm vi thời gian trong tuần hiện tại
+  const startDate = startOfWeek(new Date()); // Ngày đầu tuần
+  const endDate = endOfWeek(new Date()); // Ngày cuối tuần
+
+  // Lấy danh sách đơn hàng trong phạm vi tuần
+  const orders = await Order.find({
+    userId: idUser,
+    createdAt: { $gte: startDate, $lte: endDate }, // Lọc theo tuần
+  })
+    .select('code totalPrice createdAt status') // Chỉ lấy các trường cần thiết
+    .lean();
+
+  // Kiểm tra nếu không có đơn hàng
+  if (!orders || orders.length === 0) {
+    return res.status(404).json({
+      status: 'fail',
+      message: 'Không tìm thấy đơn hàng nào trong tuần này.',
+    });
+  }
+
+  // Định dạng dữ liệu trả về
+  const formattedOrders = orders.map((order) => ({
+    code: order.code,
+    id: order._id,
+    totalPrice: order.totalPrice,
+    creator: currentUser.fullName,
+    createdAt: format(new Date(order.createdAt), 'dd/MM/yyyy HH:mm:ss'), // Định dạng ngày
+    status: order.status,
+  }));
+
+  // Trả về dữ liệu đã định dạng
+  res.status(200).json({
+    status: 'success',
+    results: formattedOrders.length,
+    data: { orders: formattedOrders },
+  });
+});
+
+// lọc đơn hàng của khách theo tháng
+export const getOrdersByMonth = catchAsync(async (req, res, next) => {
+  const idUser = req.user.id;
+  const currentUser = req.user;
+
+  // Xác định phạm vi thời gian trong tháng hiện tại
+  const startDate = startOfMonth(new Date()); // Ngày đầu tháng
+  const endDate = endOfMonth(new Date()); // Ngày cuối tháng
+
+  // Lấy danh sách đơn hàng trong phạm vi tháng
+  const orders = await Order.find({
+    userId: idUser,
+    createdAt: { $gte: startDate, $lte: endDate }, // Lọc theo tháng
+  })
+    .select('code totalPrice createdAt status') // Chỉ lấy các trường cần thiết
+    .lean();
+
+  // Kiểm tra nếu không có đơn hàng
+  if (!orders || orders.length === 0) {
+    return res.status(404).json({
+      status: 'fail',
+      message: 'Không tìm thấy đơn hàng nào trong tháng này.',
+    });
+  }
+
+  // Định dạng dữ liệu trả về
+  const formattedOrders = orders.map((order) => ({
+    code: order.code,
+    id: order._id,
+    totalPrice: order.totalPrice,
+    creator: currentUser.fullName,
+    createdAt: format(new Date(order.createdAt), 'dd/MM/yyyy HH:mm:ss'), // Định dạng ngày
+    status: order.status,
+  }));
+
+  // Trả về dữ liệu đã định dạng
+  res.status(200).json({
+    status: 'success',
+    results: formattedOrders.length,
+    data: { orders: formattedOrders },
+  });
+});
+
+export const getAllOrderByUserId = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+
+  const currentUser = await User.findById(userId);
+
+  // Lấy danh sách đơn hàng của người dùng
+  const orders = await Order.find({ userId: userId })
+    .select('code totalPrice createdAt status') // Chỉ lấy các trường cần thiết
+    .lean();
+
+  // Kiểm tra nếu không có đơn hàng
+  if (!orders || orders.length === 0) {
+    return res.status(404).json({
+      status: 'fail',
+      message: 'Không tìm thấy đơn hàng nào.',
+    });
+  }
+
+  // Định dạng dữ liệu trả về
+  const formattedOrders = orders.map((order) => ({
+    code: order.code,
+    id: order._id,
+    totalPrice: order.totalPrice,
+    creator: currentUser.fullName,
+    createdAt: format(new Date(order.createdAt), 'dd/MM/yyyy HH:mm:ss'), // Định dạng ngày
+    status: order.status,
+  }));
+
+  // Trả về dữ liệu đã định dạng
+  res.status(200).json({
+    status: 'success',
+    results: formattedOrders.length,
+    data: { orders: formattedOrders },
   });
 });

@@ -60,6 +60,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
 
   try {
     const userId = req.user.id;
+
     const { orderItems, ...bodyData } = req.body;
 
     const {
@@ -70,8 +71,15 @@ export const createOrder = catchAsync(async (req, res, next) => {
       discountVoucher,
       discountCode,
       shippingCost,
+      orderNote,
     } = bodyData;
-
+    if (req.user.paymentRestriction === true && paymentMethod === 'COD')
+      return next(
+        new AppError(
+          'Vui lòng chọn phương thức thanh toán khác!',
+          StatusCodes.BAD_REQUEST
+        )
+      );
     const { error } = checkAddressOrderSchema.validate(
       { receiver, phoneNumber, address },
       { abortEarly: false }
@@ -114,7 +122,16 @@ export const createOrder = catchAsync(async (req, res, next) => {
         );
       }
 
-      // Cập nhật voucher khi đủ điều kiện
+      await Voucher.findOneAndUpdate(
+        { code: discountCode },
+        {
+          $push: { userIds: userId },
+          $inc: { usedCount: 1, quantity: -1 },
+          $set: {
+            status: voucher.quantity - 1 === 0 ? 'expired' : voucher.status,
+          },
+        }
+      );
     }
     let totalPrice = calculateTotalPrice(orderItems);
     if (shippingCost) totalPrice += shippingCost;
@@ -136,6 +153,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
       shippingCost,
       discountCode,
       discountVoucher,
+      orderNote,
     });
     await order.save({ session });
 
@@ -170,11 +188,6 @@ export const createOrder = catchAsync(async (req, res, next) => {
     await historyBill.save({ session });
 
     await updateCartAfterOrder(userId, orderItems);
-
-    await Voucher.findOneAndUpdate(
-      { code: discountCode },
-      { $push: { userIds: userId }, $inc: { usedCount: 1, quantity: -1 } }
-    );
 
     await session.commitTransaction();
     session.endSession();
@@ -309,11 +322,12 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     orderId: order._id,
     code: order.code,
     creator: user.fullName,
-    address: order.address,
+    phoneNumberCreator: user.phoneNumber,
+    address: order.address, //địa chỉ người nhận
     paymentMethod: order.paymentMethod,
-    phoneNumber: order.phoneNumber,
+    phoneNumber: order.phoneNumber, // sđt người nhận
     status: order.status,
-    receiver: order.receiver,
+    receiver: order.receiver, //tên người nhận
   };
 
   // Trả lại lịch sử thanh toán
@@ -472,8 +486,23 @@ export const updateStatusOrderByUser = catchAsync(async (req, res, next) => {
         update: { $inc: { saleCount: item.quantity } },
       },
     }));
-
     await Product.bulkWrite(bulkOperations);
+    const recentOrders = await Order.find({
+      userId: req.user.id,
+      status: { $in: ['Đã giao hàng', 'Đã nhận được hàng'] },
+    })
+      .sort({ createdAt: -1 }) // Sắp xếp theo thời gian tạo
+      .limit(2); // Lấy 2 đơn hàng gần nhất
+
+    // Nếu có ít nhất 2 đơn liên tiếp với trạng thái hợp lệ
+    if (recentOrders.length === 2) {
+      const allDeliveredOrReceived = recentOrders.every((order) =>
+        ['Đã giao hàng', 'Đã nhận được hàng'].includes(order.status)
+      );
+      if (allDeliveredOrReceived) {
+        await User.findByIdAndUpdate(user.id, { paymentRestriction: false });
+      }
+    }
   }
 
   const historyBill = new HistoryBill({
@@ -580,7 +609,7 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
           totalMoney =
             historyTransaction.totalMoney - updateOrder.shippingCost * 2;
         }
-
+        console.log(totalMoney);
         await refundTransaction(
           req,
           res,
@@ -625,20 +654,21 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
   if (status === 'Đã giao hàng') {
     updateOrder.status = status;
     await updateOrder.save();
+
     const user = {
       id: updateOrder.userId.id,
       email: updateOrder.userId.email,
       fullName: updateOrder.userId.fullName,
     };
 
-    // await sendMailDelivered(
-    //   user,
-    //   'Đơn hàng đã được giao thành công!',
-    //   updateOrder.code,
-    //   orderDate,
-    //   updateOrder.paymentMethod,
-    //   updateOrder.totalPrice
-    // );
+    await sendMailDelivered(
+      user,
+      'Đơn hàng đã được giao thành công!',
+      updateOrder.code,
+      orderDate,
+      updateOrder.paymentMethod,
+      updateOrder.totalPrice
+    );
 
     if (!historyTransaction) {
       const historyTransactionCod = new HistoryTransaction({
@@ -649,6 +679,24 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
         status: true,
       });
       await historyTransactionCod.save();
+    }
+
+    // Kiểm tra lịch sử đơn hàng
+    const recentOrders = await Order.find({
+      userId: user.id,
+      status: { $in: ['Đã giao hàng', 'Đã nhận được hàng'] },
+    })
+      .sort({ createdAt: -1 }) // Sắp xếp theo thời gian tạo
+      .limit(2); // Lấy 2 đơn hàng gần nhất
+
+    // Nếu có ít nhất 2 đơn liên tiếp với trạng thái hợp lệ
+    if (recentOrders.length === 2) {
+      const allDeliveredOrReceived = recentOrders.every((order) =>
+        ['Đã giao hàng', 'Đã nhận được hàng'].includes(order.status)
+      );
+      if (allDeliveredOrReceived) {
+        await User.findByIdAndUpdate(user.id, { paymentRestriction: false });
+      }
     }
   }
 

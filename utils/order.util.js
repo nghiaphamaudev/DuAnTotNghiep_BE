@@ -139,6 +139,7 @@ export const rollbackVoucherOnCancel = async (discountCode, next) => {
     if (voucher) {
       voucher.quantity += 1;
       voucher.usedCount -= 1;
+      voucher.status = 'active';
       await voucher.save();
     }
   } catch (error) {

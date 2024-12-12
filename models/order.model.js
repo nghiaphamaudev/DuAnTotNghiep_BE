@@ -88,11 +88,13 @@ const orderSchema = new mongoose.Schema(
     discountVoucher: {
       type: Number,
     },
-
     statusShip: {
       type: Boolean,
       default: false,
       required: true,
+    },
+    orderNote: {
+      type: String,
     },
   },
   {
