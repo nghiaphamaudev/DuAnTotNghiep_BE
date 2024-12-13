@@ -14,13 +14,14 @@ const initialSocket = (server) => {
       console.log('A user disconnected', socket.id);
     });
 
+    //Cập nhật trạng thái order do admin thực hiện
+
     socket.on('update status order', (id) => {
-      console.log(id);
       io.emit('update status order', id);
     });
 
+    // Cập nhật trạng thái order do user thực hiện
     socket.on('user update status order', (id) => {
-      console.log(id);
       io.emit('user update status order', id);
     });
 

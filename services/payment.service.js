@@ -336,10 +336,11 @@ export const refundTransaction = async (
           bankCode: response.data.vnp_BankCode,
         },
       });
+      console.log(historyTransaction);
       await historyTransaction.save();
       const user = await User.findOne({ _id: userId });
       await sendMailRefundCash(
-        'phamnghia19022002@gmail.com',
+        user.email,
         user.fullName,
         response.data.vnp_TransactionNo,
         formatDateTime(response.data.vnp_PayDate),
