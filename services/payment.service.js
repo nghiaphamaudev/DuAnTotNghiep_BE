@@ -336,7 +336,7 @@ export const refundTransaction = async (
           bankCode: response.data.vnp_BankCode,
         },
       });
-      console.log(historyTransaction);
+      
       await historyTransaction.save();
       const user = await User.findOne({ _id: userId });
       await sendMailRefundCash(

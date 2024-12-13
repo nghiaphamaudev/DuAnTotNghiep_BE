@@ -774,3 +774,56 @@ export const getAllOrder = catchAsync(async (req, res, next) => {
     data: orders,
   });
 });
+
+export const getAllOrderByRange = catchAsync(async (req, res, next) => {
+  const { startDate, endDate } = req.query;
+
+  // Kiểm tra nếu không nhập startDate hoặc endDate
+  if (!startDate || !endDate) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Vui lòng nhập khoảng thời gian hợp lệ.',
+    });
+  }
+
+  // Chuyển đổi định dạng ngày
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  // Kiểm tra định dạng ngày
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Dữ liệu không đúng định dạng ngày (YYYY-MM-DD).',
+    });
+  }
+
+  // Thiết lập thời gian chính xác cho khoảng ngày
+  start.setUTCHours(0, 0, 0, 0); // Đầu ngày của startDate
+  end.setUTCHours(23, 59, 59, 999); // Cuối ngày của endDate
+
+  // Lọc dữ liệu theo khoảng thời gian
+  const filter = {
+    createdAt: {
+      $gte: start,
+      $lte: end, // Bao gồm đến cuối ngày endDate
+    },
+  };
+
+  const orders = await Order.find(filter);
+
+  // Trả về kết quả
+  if (!orders || orders.length === 0) {
+    return res.status(StatusCodes.OK).json({
+      status: true,
+      message: 'Không có đơn hàng nào trong khoảng thời gian này.',
+      data: [],
+    });
+  }
+
+  res.status(StatusCodes.OK).json({
+    status: true,
+    message: 'Lấy thành công tất cả order.',
+    data: orders,
+  });
+});

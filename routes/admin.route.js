@@ -3,6 +3,7 @@ import {
   getAllOrder,
   getOrderDetailByUser,
   updateStatusOrderByAdmin,
+  getAllOrderByRange,
 } from '../controllers/order.controller';
 import {
   getAllAdminsAndSuperAdmins,
@@ -62,5 +63,6 @@ adminRouter.get('/user/:userId/payment-restriction', updatePaymentRestriction);
 adminRouter.get('/bill/:orderId', getOrderDetailByUser);
 adminRouter.patch('/update-order-admin', updateStatusOrderByAdmin);
 adminRouter.get('/all-order', getAllOrder);
+adminRouter.get('/all-order/range', getAllOrderByRange);
 
 export default adminRouter;
