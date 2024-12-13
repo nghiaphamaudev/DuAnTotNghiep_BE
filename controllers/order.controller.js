@@ -327,35 +327,35 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     paymentMethod: order.paymentMethod,
     phoneNumber: order.phoneNumber, // sđt người nhận
     status: order.status,
-    receiver: order.receiver, //tên người nhận
+    receiver: order.receiver,
+    orderNote: order.orderNote, //tên người nhận
   };
 
   // Trả lại lịch sử thanh toán
-  const historyTransaction = await HistoryTransaction.findOne({
+  const historyTransaction = await HistoryTransaction.find({
     idBill: orderId,
   });
+
   let formattedHistoryTransaction;
   // Kiểm tra nếu không tìm thấy lịch sử thanh toán
-  if (historyTransaction) {
-    formattedHistoryTransaction = historyTransaction.transactionVnPayId
-      ? {
-          totalPrice: historyTransaction.totalMoney,
-          type: historyTransaction.type,
-          transactionVnPayId: historyTransaction.transactionVnPayId,
-          createdAt: moment(
-            historyTransaction.transactionVnPayDate,
-            'YYYYMMDDHHmmss'
-          ).format('DD/MM/YYYY HH:mm:ss'),
-        }
-      : {
-          totalPrice: historyTransaction.totalMoney,
-          type: historyTransaction.type,
-          transactionVnPayId: historyTransaction.transactionVnPayId,
-          createdAt: format(
-            new Date(historyTransaction.createdAt), // Dấu phẩy sau đối số đầu tiên
-            'dd/MM/yyyy HH:mm:ss'
-          ),
-        };
+  if (historyTransaction && historyTransaction.length > 0) {
+    formattedHistoryTransaction = historyTransaction.map((transaction) => {
+      const createdAt = transaction.transactionVnPayDate
+        ? moment(transaction.transactionVnPayDate, 'YYYYMMDDHHmmss').format(
+            'DD/MM/YYYY HH:mm:ss'
+          )
+        : format(new Date(transaction.createdAt), 'dd/MM/yyyy HH:mm:ss');
+
+      return {
+        totalPrice: transaction.totalMoney,
+        type: transaction.type,
+        transactionVnPayId: transaction.transactionVnPayId,
+        createdAt,
+        ...(transaction.refundDetails && {
+          refundDetails: transaction.refundDetails,
+        }), // Thêm thông tin hoàn tiền nếu có
+      };
+    });
   }
 
   // Trả lại kết quả
@@ -609,7 +609,7 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
           totalMoney =
             historyTransaction.totalMoney - updateOrder.shippingCost * 2;
         }
-        console.log(totalMoney);
+
         await refundTransaction(
           req,
           res,
