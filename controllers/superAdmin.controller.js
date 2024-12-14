@@ -143,28 +143,45 @@ export const getAllUserAccounts = catchAsync(async (req, res, next) => {
     {
       $group: {
         _id: '$userId',
-        totalOrders: {
+        totalOrders: { $sum: 1 },
+        totalReturnOrders: {
+          $sum: {
+            $cond: { if: { $eq: ['$status', 'Hoàn đơn'] }, then: 1, else: 0 },
+          },
+        },
+        totalSuccessOrders: {
           $sum: {
             $cond: {
               if: {
-                $in: [
-                  '$status',
-                  [
-                    'Đang giao hàng',
-                    'Hoàn đơn',
-                    'Đã nhận được hàng',
-                    'Đã giao hàng',
-                  ],
-                ],
+                $in: ['$status', ['Đã giao hàng', 'Đã nhận được hàng']],
               },
               then: 1,
               else: 0,
             },
           },
         },
-        totalReturnOrders: {
+        totalCanceledOrders: {
           $sum: {
-            $cond: { if: { $eq: ['$status', 'Hoàn đơn'] }, then: 1, else: 0 },
+            $cond: { if: { $eq: ['$status', 'Đã hủy'] }, then: 1, else: 0 },
+          },
+        },
+        totalDamage: {
+          $sum: {
+            $cond: {
+              if: { $eq: ['$status', 'Hoàn đơn'] },
+              then: {
+                $add: [
+                  {
+                    $cond: {
+                      if: { $eq: ['$statusShip', true] },
+                      then: 60000,
+                      else: 30000,
+                    },
+                  },
+                ],
+              },
+              else: 0,
+            },
           },
         },
       },
@@ -174,11 +191,58 @@ export const getAllUserAccounts = catchAsync(async (req, res, next) => {
         userId: '$_id',
         totalOrders: 1,
         totalReturnOrders: 1,
+        totalSuccessOrders: 1,
+        totalCanceledOrders: 1,
+        totalDamage: 1,
         returnRate: {
-          $concat: [
-            { $toString: '$totalReturnOrders' },
-            '/',
-            { $toString: '$totalOrders' },
+          $round: [
+            {
+              $cond: {
+                if: { $ne: ['$totalOrders', 0] },
+                then: {
+                  $multiply: [
+                    { $divide: ['$totalReturnOrders', '$totalOrders'] },
+                    100,
+                  ],
+                },
+                else: 0,
+              },
+            },
+            2,
+          ],
+        },
+        successRate: {
+          $round: [
+            {
+              $cond: {
+                if: { $ne: ['$totalOrders', 0] },
+                then: {
+                  $multiply: [
+                    { $divide: ['$totalSuccessOrders', '$totalOrders'] },
+                    100,
+                  ],
+                },
+                else: 0,
+              },
+            },
+            2,
+          ],
+        },
+        cancelRate: {
+          $round: [
+            {
+              $cond: {
+                if: { $ne: ['$totalOrders', 0] },
+                then: {
+                  $multiply: [
+                    { $divide: ['$totalCanceledOrders', '$totalOrders'] },
+                    100,
+                  ],
+                },
+                else: 0,
+              },
+            },
+            2,
           ],
         },
       },
@@ -192,13 +256,24 @@ export const getAllUserAccounts = catchAsync(async (req, res, next) => {
     ) || {
       totalOrders: 0,
       totalReturnOrders: 0,
-      returnRate: '0/0',
+      totalSuccessOrders: 0,
+      totalCanceledOrders: 0,
+      totalDamage: 0,
+      returnRate: 0,
+      successRate: 0,
+      cancelRate: 0,
     };
     return {
+      userId: user._id,
       ...user.toObject(),
       totalOrders: orderData.totalOrders,
       totalReturnOrders: orderData.totalReturnOrders,
+      totalSuccessOrders: orderData.totalSuccessOrders,
+      totalCanceledOrders: orderData.totalCanceledOrders,
+      totalDamage: orderData.totalDamage,
       returnRate: orderData.returnRate,
+      successRate: orderData.successRate,
+      cancelRate: orderData.cancelRate,
     };
   });
 
