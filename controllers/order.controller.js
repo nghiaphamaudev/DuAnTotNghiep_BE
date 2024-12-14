@@ -500,7 +500,9 @@ export const updateStatusOrderByUser = catchAsync(async (req, res, next) => {
         ['Đã giao hàng', 'Đã nhận được hàng'].includes(order.status)
       );
       if (allDeliveredOrReceived) {
-        await User.findByIdAndUpdate(user.id, { paymentRestriction: false });
+        await User.findByIdAndUpdate(req.user.id, {
+          paymentRestriction: false,
+        });
       }
     }
   }
@@ -513,6 +515,7 @@ export const updateStatusOrderByUser = catchAsync(async (req, res, next) => {
     statusBill: status,
     note: req.body.note || '',
   });
+
   await historyBill.save();
   res
     .status(StatusCodes.OK)
