@@ -58,7 +58,10 @@ adminRouter.get('/orders/user/:userId/statistics', getOrderStatistics);
 //Lấy tất cả đơn hàng của user
 adminRouter.get('/orders/user/:userId', getAllOrderByUserId);
 //cập nhật trạng thái yêu cầu thanh toán trước
-adminRouter.get('/user/:userId/payment-restriction', updatePaymentRestriction);
+adminRouter.patch(
+  '/user/:userId/payment-restriction',
+  updatePaymentRestriction
+);
 
 adminRouter.get('/bill/:orderId', getOrderDetailByUser);
 adminRouter.patch('/update-order-admin', updateStatusOrderByAdmin);
