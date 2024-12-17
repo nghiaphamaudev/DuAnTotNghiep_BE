@@ -73,6 +73,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
       shippingCost,
       orderNote,
     } = bodyData;
+    console.log(discountCode, discountVoucher);
     if (req.user.paymentRestriction === true && paymentMethod === 'COD')
       return next(
         new AppError(
