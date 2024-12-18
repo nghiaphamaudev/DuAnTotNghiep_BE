@@ -26,6 +26,8 @@ import {
 } from '../utils/order.util';
 import Voucher from '../models/voucher.model';
 import User from '../models/user.model';
+import RoundRobin from '../models/roundRobin.model';
+import Admin from '../models/admin.model';
 
 function calculateTotalPrice(items) {
   return items.reduce((total, item) => {
@@ -53,6 +55,55 @@ const updateCartAfterOrder = async (userId, orderItems) => {
     console.error('Lỗi khi cập nhật giỏ hàng:', error);
   }
 };
+async function assignOrderToAdmin() {
+  // Bước 1: Lấy danh sách admin hoạt động và đảm bảo sắp xếp cố định
+  const allAdmins = await Admin.find({ role: 'admin' })
+    .select('_id active')
+    .sort({ _id: 1 })
+    .lean();
+
+  console.log('Danh sách tất cả admin:', allAdmins);
+
+  if (!allAdmins || allAdmins.length === 0) {
+    throw new Error('Không tìm thấy admin nào để phân công.');
+  }
+
+  // Bước 2: Lấy trạng thái currentIndex từ MongoDB
+  let state = await RoundRobin.findOne();
+
+  // Nếu chưa tồn tại, khởi tạo state với currentIndex = 0
+  if (!state) {
+    state = await RoundRobin.create({ currentIndex: 0 });
+  }
+
+  let currentIndex = state.currentIndex;
+
+  // Bước 3: Tìm admin hoạt động tiếp theo
+  let attempts = 0;
+  const totalAdmins = allAdmins.length;
+
+  while (attempts < totalAdmins) {
+    const admin = allAdmins[currentIndex];
+    if (admin.active) {
+      // Tìm thấy admin hoạt động
+      state.currentIndex = (currentIndex + 1) % totalAdmins;
+      await state.save();
+
+      console.log(
+        `Phân công cho admin: ${admin._id}, currentIndex: ${currentIndex}`
+      );
+      return admin._id; // Trả về _id của admin được phân công
+    }
+
+    // Chuyển đến admin tiếp theo
+    currentIndex = (currentIndex + 1) % totalAdmins;
+    attempts++;
+  }
+
+  // Nếu không tìm thấy admin nào hoạt động
+  throw new Error('Không có admin nào hoạt động để phân công.');
+}
+
 
 export const createOrder = catchAsync(async (req, res, next) => {
   const session = await mongoose.startSession();
@@ -140,6 +191,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
 
     // Gọi RollbackQuantityProduct và đảm bảo sẽ dừng quá trình nếu có lỗi
     await RollbackQuantityProduct(orderItems, next);
+    const assignedAdminId = await assignOrderToAdmin();
 
     const order = new Order({
       userId,
@@ -154,6 +206,7 @@ export const createOrder = catchAsync(async (req, res, next) => {
       discountCode,
       discountVoucher,
       orderNote,
+      assignedTo: assignedAdminId,
     });
     await order.save({ session });
 

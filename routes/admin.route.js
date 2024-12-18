@@ -18,6 +18,7 @@ import {
   getOrderStatistics,
   updatePaymentRestriction,
   getAllOrderByUserId,
+  getAllOrderWithAccountAdmin,
 } from '../controllers/superAdmin.controller';
 import {
   protectAdmin,
@@ -62,6 +63,8 @@ adminRouter.patch(
   '/user/:userId/payment-restriction',
   updatePaymentRestriction
 );
+
+adminRouter.get('/orders/admin', getAllOrderWithAccountAdmin);
 
 adminRouter.get('/bill/:orderId', getOrderDetailByUser);
 adminRouter.patch('/update-order-admin', updateStatusOrderByAdmin);

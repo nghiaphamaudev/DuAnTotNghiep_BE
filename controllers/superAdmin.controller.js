@@ -626,3 +626,14 @@ export const getAllOrderByUserId = catchAsync(async (req, res, next) => {
     data: { orders: formattedOrders },
   });
 });
+
+export const getAllOrderWithAccountAdmin = catchAsync(
+  async (req, res, next) => {
+    const idAdmin = req.admin.id;
+
+    const orders = await Order.find({ assignedTo: idAdmin });
+    if (!orders)
+      return res.status(StatusCodes.OK).json({ status: true, data: null });
+    return res.status(StatusCodes.OK).json({ status: true, data: orders });
+  }
+);

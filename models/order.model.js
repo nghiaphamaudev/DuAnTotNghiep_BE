@@ -96,6 +96,11 @@ const orderSchema = new mongoose.Schema(
     orderNote: {
       type: String,
     },
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin',
+      required: false,
+    },
   },
   {
     timestamps: true, // Đặt timestamps ở đây
