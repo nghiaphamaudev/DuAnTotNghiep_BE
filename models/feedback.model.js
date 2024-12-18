@@ -4,7 +4,7 @@ const feedbackSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.ObjectId,
-      required: [true, 'The cart must have a user id!'],
+      required: true,
       ref: 'User',
     },
     productId: {
@@ -12,19 +12,32 @@ const feedbackSchema = new mongoose.Schema(
       required: true,
       ref: 'Product',
     },
-    classify: { type: String, required: true },
+    classify: { type: Boolean, default: true },
     rating: { type: Number, required: true },
     comment: { type: String, required: false, default: '' },
     images: [String], //mở rộng
     like: { type: Number, require: false, default: 0 },
+    likedBy: [{ type: mongoose.Schema.ObjectId, ref: 'User' }],
   },
   {
-    toObject: { virtuals: true },
-    toJSON: { virtuals: true },
-    versionKey: false,
-    timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_, ret) => {
+        delete ret._id;
+      },
+      timestamps: true,
+      versionKey: false,
+    },
   }
 );
-
+feedbackSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
 const Feedback = mongoose.model('Feedback', feedbackSchema);
 export default Feedback;

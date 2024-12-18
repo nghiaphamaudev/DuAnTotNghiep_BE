@@ -1,14 +1,14 @@
 import AppError from '../utils/appError.util';
-
+import { StatusCodes } from 'http-status-codes';
 const handleValidatorError = (error) => {
   const errors = Object.values(error.errors).map((el) => el.message);
   const message = errors.join('. ');
-  return new AppError(message, 400);
+  return new AppError(message, StatusCodes.BAD_REQUEST);
 };
 
 const handleCastError = (error) => {
-  const message = 'The ID product not existed!';
-  return new AppError(message, 400);
+  const message = 'ID sản phẩm không tồn tại!';
+  return new AppError(message, StatusCodes.BAD_REQUEST);
 };
 
 const handleDuplicateDB = (error) => {
@@ -18,13 +18,18 @@ const handleDuplicateDB = (error) => {
     value.replace(value[0], value[0].toUpperCase())
   );
   values = values.join(' ');
-  const message = `${values} has exsisted . Try again!`;
-  return new AppError(message, 400);
+  const message = `${values} đã tồn tại . Thử lại!`;
+  return new AppError(message, StatusCodes.BAD_REQUEST);
 };
 
 const handleJWTExpired = (error) => {
-  const message = 'Your session has expired. Please log in again.';
-  return new AppError(message, 400);
+  const message = 'Phiên đăng nhập của bạn đã hết hạn. Vui lòng đăng nhập lại.';
+  return new AppError(message, StatusCodes.BAD_REQUEST);
+};
+
+const handleLimitFileUser = (error) => {
+  const message = 'Tối đa 1 hỉnh ảnh';
+  return new AppError(message, StatusCodes.BAD_REQUEST);
 };
 
 const sendErrorDev = (err, req, res) => {
@@ -41,19 +46,20 @@ const sendErrorProd = (err, req, res) => {
   }
   if (err.isOperational) {
     res.status(err.statusCode).json({
-      status: err.status,
+      status: false,
       message: err.message,
+      data: null,
     });
   } else {
     res.status(500).json({
       status: 'error',
-      message: 'Something went wrong!!',
+      message: 'Có gì đó không ổn!!',
     });
   }
 };
 
-const errorHandler = (err, req, res, next) => {
-  err.statusCode = err.statusCode || 500;
+const errorHandlerGlobal = (err, req, res, next) => {
+  err.statusCode = err.statusCode || StatusCodes.INTERNAL_SERVER_ERROR;
   err.status = err.status || 'error';
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, req, res);
@@ -64,8 +70,10 @@ const errorHandler = (err, req, res, next) => {
     if (err.code === 11000) error = handleDuplicateDB(error);
     if (err.name === 'CastError') error = handleCastError(error);
     if (err.message === 'jwt expired') error = handleJWTExpired(error);
+    if (err.code === 'LIMIT_UNEXPECTED_FILE')
+      error = handleLimitFileUser(error);
     sendErrorProd(error, req, res);
   }
 };
 
-export default errorHandler;
+export default errorHandlerGlobal;

@@ -28,7 +28,8 @@ export const addCategory = catchAsync(async (req, res, next) => {
   });
 
   return res.status(201).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: newCategory,
   });
 });
@@ -40,7 +41,8 @@ export const getAllCategorySeason = catchAsync(async (req, res, next) => {
     return next(new AppError('No category', StatusCodes.NOT_FOUND));
   }
   return res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: categoriesseason,
   });
 });
@@ -60,37 +62,51 @@ export const getCategoriesBySeason = catchAsync(async (req, res, next) => {
 
   // Trả về danh mục theo mùa
   return res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: categoriesseason,
   });
 });
 
-//lấy sản phẩm trong dung mục
-export const getProductsByCategory = catchAsync(async (req, res, next) => {
-  const { id } = req.params; // Lấy ID danh mục từ URL params
+//lấy sản phẩm trong dung mục theo mùa
+export const getProductsByCategoryAndSeason = catchAsync(
+  async (req, res, next) => {
+    const { id, season } = req.params; // Lấy ID danh mục và mùa từ URL params
 
-  // Tìm danh mục theo ID
-  const category = await CategorySeason.findById(id);
+    // Tìm danh mục theo ID
+    const category = await CategorySeason.findById(id);
 
-  // Kiểm tra danh mục
-  if (!category) {
-    return next(
-      new AppError('The category ID does not exist!', StatusCodes.NOT_FOUND)
-    );
+    // Kiểm tra danh mục
+    if (!category) {
+      return next(
+        new AppError('The category ID does not exist!', StatusCodes.NOT_FOUND)
+      );
+    }
+
+    // Kiểm tra mùa có khớp với mùa của danh mục không
+    if (category.season !== season) {
+      return next(
+        new AppError(
+          'The category does not belong to this season!',
+          StatusCodes.BAD_REQUEST
+        )
+      );
+    }
+
+    // Lấy tất cả sản phẩm thuộc danh mục
+    const products = await Product.find({ category: id });
+    if (!products.length) {
+      return next(new AppError('No Product', StatusCodes.BAD_REQUEST));
+    }
+
+    return res.status(StatusCodes.OK).json({
+      status: true,
+      message: 'Thành công',
+      category,
+      products,
+    });
   }
-
-  // Lấy tất cả sản phẩm thuộc danh mục
-  const products = await Product.find({ category: id });
-  if (!products.length) {
-    return next(new AppError('No Product', StatusCodes.BAD_REQUEST));
-  }
-
-  return res.status(StatusCodes.OK).json({
-    status: 'success',
-    category,
-    products,
-  });
-});
+);
 
 //xóa danh mục
 export const deleteCategorySeason = catchAsync(async (req, res, next) => {
@@ -108,7 +124,8 @@ export const deleteCategorySeason = catchAsync(async (req, res, next) => {
   }
 
   return res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: categorySeason,
   });
 });
@@ -144,7 +161,8 @@ export const updateCategorySeason = catchAsync(async (req, res, next) => {
   }
 
   return res.status(200).json({
-    status: 'success',
+    status: true,
+    message: 'Thành công',
     data: categorySeason,
   });
 });
