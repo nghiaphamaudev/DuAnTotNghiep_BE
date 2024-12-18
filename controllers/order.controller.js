@@ -104,7 +104,6 @@ async function assignOrderToAdmin() {
   throw new Error('Không có admin nào hoạt động để phân công.');
 }
 
-
 export const createOrder = catchAsync(async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -817,14 +816,19 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
 });
 
 export const getAllOrder = catchAsync(async (req, res, next) => {
-  const orders = await Order.find();
-  if (!orders) {
-    res.status(StatusCodes.OK).json({
+  const orders = await Order.find().populate({
+    path: 'assignedTo', // Trường 'assignedTo' là ObjectId của Admin
+    select: 'fullName', // Chỉ lấy trường fullName
+  });
+
+  if (!orders || orders.length === 0) {
+    return res.status(StatusCodes.OK).json({
       status: true,
       message: 'Lấy thành công tất cả order',
       data: null,
     });
   }
+
   res.status(StatusCodes.OK).json({
     status: true,
     message: 'Lấy thành công tất cả order',
