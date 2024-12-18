@@ -25,6 +25,10 @@ const initialSocket = (server) => {
       io.emit('user update status order', id);
     });
 
+    socket.on('create order', (idAdmin) => {
+      io.emit('create order', idAdmin);
+    });
+
     console.log('Socket.IO server running...');
   });
 };
