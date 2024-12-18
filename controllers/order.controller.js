@@ -376,6 +376,7 @@ export const getOrderDetailByUser = catchAsync(async (req, res, next) => {
     phoneNumberCreator: user.phoneNumber,
     address: order.address, //địa chỉ người nhận
     paymentMethod: order.paymentMethod,
+    statusPayment: order.statusPayment,
     phoneNumber: order.phoneNumber, // sđt người nhận
     status: order.status,
     receiver: order.receiver,
