@@ -62,8 +62,6 @@ async function assignOrderToAdmin() {
     .sort({ _id: 1 })
     .lean();
 
-  console.log('Danh sách tất cả admin:', allAdmins);
-
   if (!allAdmins || allAdmins.length === 0) {
     throw new Error('Không tìm thấy admin nào để phân công.');
   }
@@ -559,6 +557,8 @@ export const updateStatusOrderByUser = catchAsync(async (req, res, next) => {
       }
     }
   }
+  updateOrder.statusPayment = 'Đã thanh toán';
+  await updateOrder.save();
 
   const historyBill = new HistoryBill({
     userId: req.user.id,
@@ -709,6 +709,7 @@ export const updateStatusOrderByAdmin = catchAsync(async (req, res, next) => {
 
   if (status === 'Đã giao hàng') {
     updateOrder.status = status;
+    updateOrder.statusPayment = 'Đã thanh toán';
     await updateOrder.save();
 
     const user = {
