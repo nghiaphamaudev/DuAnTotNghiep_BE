@@ -29,6 +29,11 @@ const initialSocket = (server) => {
       io.emit('create order', idAdmin);
     });
 
+    socket.on('hidden product', (id) => {
+      console.log(id);
+      io.emit('hidden product', id);
+    });
+
     console.log('Socket.IO server running...');
   });
 };

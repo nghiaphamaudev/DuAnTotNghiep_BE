@@ -53,6 +53,7 @@ const getPaginatedData = async (model, currentUserId = null, page, limit) => {
 };
 
 export const createAccBySuperAdmin = catchAsync(async (req, res, next) => {
+  const activeAdmins = await getActiveAdminsFromRedis(); // Lấy danh sách admin từ Redis
   const { email, fullName, password, role, phoneNumber } = req.body;
 
   // Validate dữ liệu
@@ -84,11 +85,23 @@ export const createAccBySuperAdmin = catchAsync(async (req, res, next) => {
       ? { email, fullName, password, role }
       : { email, fullName, password, phoneNumber };
 
-  await model.create(newUser);
+  // Lưu tài khoản mới vào MongoDB
+  const createdUser = await model.create(newUser);
+
+  // Nếu đây là một admin, cập nhật danh sách admin trong Redis
+  if (role === 'admin' || role === 'superadmin') {
+    // Thêm id của admin mới vào danh sách activeAdmins
+    activeAdmins.push(createdUser._id.toString());
+
+    // Cập nhật lại danh sách admin trong Redis
+    await redisClient.set('activeAdmins', JSON.stringify(activeAdmins));
+  }
+
+  console.log(activeAdmins);
 
   res.status(StatusCodes.OK).json({
     status: true,
-    message: 'Thành công',
+    message: 'Tạo tài khoản thành công',
   });
 });
 
