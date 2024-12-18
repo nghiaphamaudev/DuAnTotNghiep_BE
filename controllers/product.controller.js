@@ -130,11 +130,8 @@ export const getDetailProductById = catchAsync(async (req, res, next) => {
   if (!product) {
     return next(new AppError('Sản phẩm không tồn tại', StatusCodes.NOT_FOUND));
   }
-
-  const feedbacks = await Feedback.find({ productId: product._id })
-    .populate('user', 'rating fullName avatar');  // Populate user thông qua feedback
-
-  // Tính toán ratingAverage từ feedbacks
+  const feedbacks = await Feedback.find({ productId: product._id, classify: true })
+    .populate('user', 'rating fullName avatar');
   const totalRating = feedbacks.reduce((acc, feedback) => acc + feedback.rating, 0);
   const ratingAverage = feedbacks.length > 0 ? totalRating / feedbacks.length : 0;
   product.ratingAverage = ratingAverage;

@@ -5,10 +5,7 @@ const connectDB = async (db, maxRetries = 5, delay = 3000) => {
 
   while (retries < maxRetries) {
     try {
-      await mongoose.connect(db, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
+      await mongoose.connect(db);
       console.log('The connection is successfully established!');
       return; // Nếu kết nối thành công, thoát khỏi vòng lặp
     } catch (error) {
